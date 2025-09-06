@@ -19,6 +19,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import androidx.compose.ui.draw.shadow
 @Composable
 fun CalendarScreen(
     calendarViewModel: CalendarViewModel,
@@ -27,6 +31,15 @@ fun CalendarScreen(
     val calendarState by calendarViewModel.calendarState.collectAsState()
     val SoftBlue = Color(0xFF82B1FF)
     Column(modifier = Modifier.padding(16.dp)) {
+        val SoftBlue = Color(0xFF82B1FF) // already defined
+        Text(
+            text = "TimyNice: Your Daily Wins! 😉 📈",
+            style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.primary,
+            fontSize = 22.sp, // modify1: smaller, softer
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
         // Header row: Year-Month and monthly accomplishment %
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -37,31 +50,25 @@ fun CalendarScreen(
                 text = calendarState.yearMonth.format(DateTimeFormatter.ofPattern("yyyy - MMMM")),
                 style = MaterialTheme.typography.headlineMedium
             )
-            /*Text(
-                text = "%.0f%%".format(calendarState.calAccomplish),
-                style = MaterialTheme.typography.headlineMedium,
-                color = Color.Blue
-            )*/
-
-            /*val monthlyAccomplishmentText = if (calendarState.calAccomplish >= 100f) {
-                "🎉 %.0f%%".format(calendarState.calAccomplish)
-            } else {
-                "📈 %.0f%%".format(calendarState.calAccomplish)
-            }
-            Text(
-                text = monthlyAccomplishmentText,
-                style = MaterialTheme.typography.headlineMedium,
-                color = Color.Blue,
-                fontSize = 20.sp
-            )*/
         }
         Spacer(modifier = Modifier.height(8.dp))
         // Weekday headers
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceAround
+        ) {
             listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat").forEach {
-                Text(text = it, fontWeight = FontWeight.Bold, modifier = Modifier.width(40.dp), maxLines = 1)
+                Text(
+                    text = it,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(44.dp),
+                    maxLines = 1
+                )
             }
         }
+
+
         Spacer(modifier = Modifier.height(4.dp))
         // Days grid
         LazyVerticalGrid(
@@ -83,9 +90,13 @@ fun CalendarScreen(
                 val displayText = if (accomplish > 0f) "$day(${accomplish.toInt()}%)" else "$day"
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(44.dp)
                         .padding(2.dp)
-                        .background(if (isToday) Color.LightGray else Color.Transparent)
+                        .shadow(elevation = if (isToday) 6.dp else 2.dp, shape = RoundedCornerShape(8.dp))
+                        .background(
+                            color = if (isToday) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                            shape = RoundedCornerShape(8.dp)
+                        )
                         .clickable { onDayClick(dayStr) },
                     contentAlignment = Alignment.Center
                 ) {
@@ -136,7 +147,7 @@ fun AccomplishmentChartLine(
         val dayStr = String.format("%04d-%02d-%02d", yearMonth.year, yearMonth.monthValue, day)
         dayAccomplishments[dayStr] ?: 0f
     }
-    val maxHeight = 120.dp // Increased height for y-axis labels
+    val maxHeight = 150.dp // Increased height for y-axis labels
     val yAxisSteps = listOf(100f, 75f, 50f, 25f, 0f) // Y-axis values
     Column(
         modifier = Modifier
@@ -153,21 +164,6 @@ fun AccomplishmentChartLine(
                 .padding(start = 30.dp)) { // Leave space for y-axis labels
                 //val widthPerDay = (size.width - 30.dp.toPx()) / daysInMonth
                 val widthPerDay = size.width / daysInMonth
-
-                // Draw line
-                /*for (i in 0 until dataPoints.size - 1) {
-                    val startX = i * widthPerDay
-
-                    val startY = chartHeightPx * (1f - dataPoints[i] / 100f)
-                    val endX = (i + 1) * widthPerDay
-                    val endY = chartHeightPx * (1f - dataPoints[i + 1] / 100f)
-                    drawLine(
-                        color = Color.Blue,
-                        start = Offset(startX, startY),
-                        end = Offset(endX, endY),
-                        strokeWidth = 1.dp.toPx()
-                    )
-                }*/
 
                 for (i in 0 until dataPoints.size - 1) {
                     val startX = i * widthPerDay + widthPerDay / 2f
@@ -206,13 +202,12 @@ fun AccomplishmentChartLine(
                 }
 
                 // Add circle markers on top of line segments
-                val markerRadius = 1.5.dp.toPx()
                 dataPoints.forEachIndexed { index, value ->
                     val x = index * widthPerDay + widthPerDay / 2f
                     val y = chartHeightPx * (1f - value / 100f)
                     drawCircle(
                         color = Color.Blue,
-                        radius = markerRadius,
+                        radius = 1.5.dp.toPx(),
                         center = Offset(x, y),
                     )
                 }
@@ -229,7 +224,7 @@ fun AccomplishmentChartLine(
                         text = "${yValue.toInt()}%",
                         fontSize = 10.sp,
                         modifier = Modifier.height(maxHeight / (yAxisSteps.size - 1)),
-                        color = Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -252,7 +247,7 @@ fun AccomplishmentChartLine(
                 ) {
                     Text(
                         text = day.toString(),
-                        fontSize = 7.sp,
+                        fontSize = 7.2.sp,
                         color = Color.DarkGray,
                         maxLines = 1
                     )

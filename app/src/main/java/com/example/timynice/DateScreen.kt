@@ -158,7 +158,7 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
                         viewModel.resetActivities()
                     }
                 },
-                containerColor = MaterialTheme.colorScheme.secondary
+                containerColor = MaterialTheme.colorScheme.primary
             ) {
                 Icon(Icons.Default.Delete, contentDescription = "Reset Activities")
             }
@@ -211,7 +211,7 @@ fun ActivityRow(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color(0xFFEFEFEF)) // light gray background
-            .padding(horizontal = 1.dp, vertical = 1.dp)
+            .padding(horizontal = 0.dp, vertical = 0.dp)
     ) {
         // Reusable compact field builder
         @Composable
@@ -223,9 +223,10 @@ fun ActivityRow(
         ) {
             Box(
                 modifier = modifier
-                    .border(1.dp, Color.Gray)
+                    .border(0.1.dp, Color.Gray)
                     .background(Color.White)
-                    .padding(horizontal = 2.dp, vertical = 1.dp)
+                    .padding(horizontal = 0.1.dp, vertical = 0.1.dp)
+                    .height(20.dp)
                     .then(if (!enabled) Modifier else Modifier)
             ) {
                 BasicTextField(
@@ -287,10 +288,10 @@ fun ActivityRow(
         Box(
             modifier = Modifier
                 .weight(0.4f)
-                .height(26.dp)
-                .border(1.dp, Color.Gray)
+                .height(20.dp)
+                .border(0.1.dp, Color.Gray)
+                .padding(horizontal = 0.1.dp, vertical = 0.1.dp)
                 .background(Color.White),
-            //.padding(horizontal = 4.dp, vertical = 2.dp),
             contentAlignment = Alignment.Center
         ) {
             Checkbox(
@@ -308,10 +309,10 @@ fun ActivityRow(
         Box(
             modifier = Modifier
                 .weight(0.4f)
-                .height(26.dp)
-                .border(1.dp, Color.Gray)
+                .height(20.dp)
+                .border(0.1.dp, Color.Gray)
                 .background(Color.White)
-                .padding(horizontal = 2.dp, vertical = 1.dp),
+                .padding(horizontal = 0.1.dp, vertical = 0.1.dp),
             contentAlignment = Alignment.Center
         ) {
             IconButton(
