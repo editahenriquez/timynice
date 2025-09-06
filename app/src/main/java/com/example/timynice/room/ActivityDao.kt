@@ -34,13 +34,4 @@ interface ActivityDao {
     """)
     suspend fun getRecentActivitiesByWeekday(currentDate: String, weekday: String): List<ActivityEntity>
 
-    // Get activities of Monday before currentDate for initial fill.
-    @Query("""
-    SELECT * FROM activities 
-    WHERE strftime('%w', dayId) = "1"
-    AND dayId < :currentDate 
-    ORDER BY dayId DESC
-    """)
-    suspend fun getMondayActivitiesForInitialLoad(currentDate: String, weekday: String): List<ActivityEntity>
-
 }

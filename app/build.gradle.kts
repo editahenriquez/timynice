@@ -58,9 +58,10 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.ui.geometry)
     ksp(libs.androidx.room.compiler)
     // UUID for generating unique IDs
-    implementation(libs.androidx.uuid)
+    implementation(libs.uuid)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

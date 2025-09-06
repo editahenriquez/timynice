@@ -12,6 +12,8 @@ composeBom = "2024.09.00"
 navigationCompose = "2.9.3"
 roomRuntime = "2.7.2"
 uuid = "1.1.0"
+uuidVersion = "0.8.4"
+uiGeometry = "1.9.0"
 
 [libraries]
 androidx-compose-foundation = { module = "androidx.compose.foundation:foundation", version.ref = "foundation" }
@@ -34,6 +36,8 @@ androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "u
 androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+uuid = { module = "com.benasher44:uuid", version.ref = "uuidVersion" }
+androidx-compose-ui-geometry = { group = "androidx.compose.ui", name = "ui-geometry", version.ref = "uiGeometry" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
