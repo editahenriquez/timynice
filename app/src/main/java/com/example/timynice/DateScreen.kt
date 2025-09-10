@@ -1,3 +1,4 @@
+
 package com.example.timynice
 
 import androidx.compose.foundation.background
@@ -5,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
@@ -23,7 +25,10 @@ import java.time.format.DateTimeFormatter
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
-
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 
 @Composable
 fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalendar: () -> Unit) {
@@ -42,7 +47,7 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
         editableMessage = dayMessage
     }
 
-    Column(modifier = Modifier.padding(16.dp)) {
+    Column(modifier = Modifier.padding(16.dp).fillMaxHeight() ) {
         /*Text(
             text = date,
             style = MaterialTheme.typography.headlineSmall
@@ -61,13 +66,13 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
 
             Text(
                 text = date,
-                fontSize = 15.sp, // modify1: reduced date size
-                color = MaterialTheme.colorScheme.onBackground // optional: ensure it fits the theme
+                fontSize = 17.sp, // modify1: reduced date size
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
         Spacer(modifier = Modifier.height(4.dp))//8
 
-        Text("Motivational Message", fontSize = 12.sp, color = Color.DarkGray)
+        Text("Motivational Message / Comment", fontSize = 14.sp, color = MaterialTheme.colorScheme.outline)
         Spacer(modifier = Modifier.height(1.dp))
 
         Box(
@@ -83,7 +88,7 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
                     viewModel.updateDayMessage(it)
                 },
                 textStyle = LocalTextStyle.current.copy(
-                    fontSize = 14.sp,
+                    fontSize = 15.sp,
                     color = MaterialTheme.colorScheme.onBackground
                 ),
                 modifier = Modifier.fillMaxWidth(),
@@ -91,24 +96,77 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
             )
         }
 
-        Spacer(modifier = Modifier.height(2.dp))//8
-        //Text("Completion: %.0f%%".format(accomplishment), color = Color.Blue, fontSize = 15.sp)
+        Spacer(modifier = Modifier.height(4.dp))//8
 
         Text(
             text = if (accomplishment < 100) {
                 "Progress: ${accomplishment.toInt()}% 📈"
             } else {
-                "Congrats! Mission achieved 🎉"
+                "Congrats! Mission achieved: ${accomplishment.toInt()}% 🎉"
             },
             color = Color.Blue,
-            fontSize = 15.sp
+            fontSize = 16.sp
         )
 
         Spacer(modifier = Modifier.height(2.dp))//8
 
+        Text(
+            text = "Format: hh:mm (e.g., 1 ->10:00, 12 ->12:00, 123 →12:30, 1235 ->12:35)",
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.outline,
+        )
+
+        Spacer(modifier = Modifier.height(1.5.dp))
+
+        // Header row for field labels
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 1.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Activity",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(2f),
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = "Time",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(0.5f),
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = "Start",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(0.5f),
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = "End",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(0.5f),
+                textAlign = TextAlign.Center
+            )
+            Box(modifier = Modifier.weight(0.4f)) // Placeholder for checkbox
+            Box(modifier = Modifier.weight(0.4f)) // Placeholder for delete button
+        }
+        Spacer(modifier = Modifier.height(1.5.dp))
+
         // Activity List
         LazyColumn(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
             itemsIndexed(activities) { index, activity ->
@@ -129,23 +187,27 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        Row {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        )  {
             FloatingActionButton(
                 onClick = {
                     val newStart = if (activities.isNotEmpty()) {
                         activities.last().end
-                    } else "00:00:00"
+                    } else "00:00"
                     val newActivity = ActivityEntity(
                         dayId = date,
                         name = "",
-                        duration = "00:00:00",
+                        duration = "00:00",
                         start = newStart,
                         end = newStart,
                         checked = false
                     )
                     viewModel.insertOrUpdateActivity(newActivity)
                 },
-                containerColor = MaterialTheme.colorScheme.primary
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Activity")
             }
@@ -158,7 +220,8 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
                         viewModel.resetActivities()
                     }
                 },
-                containerColor = MaterialTheme.colorScheme.primary
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
             ) {
                 Icon(Icons.Default.Delete, contentDescription = "Reset Activities")
             }
@@ -181,6 +244,8 @@ fun ActivityRow(
     var end = activity.end
     var checked by remember { mutableStateOf(activity.checked) }
 
+    var hasFocus by remember { mutableStateOf(false) }
+
     // Auto-set start if not first row
     LaunchedEffect(previousEndTime) {
         if (!isFirstRow && previousEndTime != null && start != previousEndTime) {
@@ -191,14 +256,14 @@ fun ActivityRow(
 
     // Auto-calculate end time
     LaunchedEffect(start, duration) {
-        val formatter = DateTimeFormatter.ofPattern("HH:mm:ss")
+        val formatter = DateTimeFormatter.ofPattern("HH:mm")
         try {
             val startTime = LocalTime.parse(start, formatter)
             val parts = duration.split(":").map { it.toIntOrNull() ?: 0 }
             val durHours = parts.getOrElse(0) { 0 }
             val durMinutes = parts.getOrElse(1) { 0 }
             val durSeconds = parts.getOrElse(2) { 0 }
-            val durTotalSeconds = durHours * 3600 + durMinutes * 60 + durSeconds
+            val durTotalSeconds = durHours * 3600 + durMinutes * 60
             val endTime = startTime.plusSeconds(durTotalSeconds.toLong()).format(formatter)
             if (activity.end != endTime) {
                 onActivityChange(activity.copy(end = endTime))
@@ -212,6 +277,8 @@ fun ActivityRow(
             .fillMaxWidth()
             .background(Color(0xFFEFEFEF)) // light gray background
             .padding(horizontal = 0.dp, vertical = 0.dp)
+            .shadow(2.dp, RoundedCornerShape(5.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(5.dp))
     ) {
         // Reusable compact field builder
         @Composable
@@ -220,21 +287,26 @@ fun ActivityRow(
             onValueChange: (String) -> Unit,
             modifier: Modifier = Modifier,
             enabled: Boolean = true,
+            centerText: Boolean = false
         ) {
             Box(
                 modifier = modifier
-                    .border(0.1.dp, Color.Gray)
-                    .background(Color.White)
+                    .border(0.1.dp, MaterialTheme.colorScheme.outline, shape = RoundedCornerShape(2.dp))
+                    .background(MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(2.dp))
                     .padding(horizontal = 0.1.dp, vertical = 0.1.dp)
                     .height(20.dp)
-                    .then(if (!enabled) Modifier else Modifier)
+                    .then(if (!enabled) Modifier else Modifier),
+                contentAlignment = Alignment.Center
             ) {
                 BasicTextField(
                     value = value,
                     onValueChange = onValueChange,
                     singleLine = true,
                     enabled = enabled,
-                    textStyle = LocalTextStyle.current.copy(fontSize = 10.sp),//9
+                    textStyle = LocalTextStyle.current.copy(
+                        fontSize = 13.sp,
+                        textAlign = if (centerText) TextAlign.Center else TextAlign.Start
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -249,29 +321,52 @@ fun ActivityRow(
             modifier = Modifier.weight(2f)
         )
 
-        Spacer(modifier = Modifier.width(1.dp))
+        Spacer(modifier = Modifier.width(0.dp))
 
         CompactTextField(
             value = duration,
             onValueChange = {
                 duration = it
-                onActivityChange(activity.copy(duration = it))
             },
-            modifier = Modifier.weight(0.6f)
+            modifier = Modifier
+                .weight(0.5f)
+                .onFocusChanged { focusState ->
+                                    if (hasFocus && !focusState.isFocused)
+                                    {
+                                        // Focus lost: format now
+                                        val formatted = formatToTime(duration)
+                                        duration = formatted
+                                        onActivityChange(activity.copy(duration = formatted))
+                                    }
+                                    hasFocus = focusState.isFocused
+                                },
+            centerText = true,
         )
 
-        Spacer(modifier = Modifier.width(1.dp))
+        Spacer(modifier = Modifier.width(0.dp))
 
         CompactTextField(
             value = start,
             onValueChange = {
                 start = it
-                onActivityChange(activity.copy(start = it))
+                //onActivityChange(activity.copy(start = it))
             },
-            modifier = Modifier.weight(0.6f)
+            modifier = Modifier
+                .weight(0.5f)
+                .onFocusChanged { focusState ->
+                    if (hasFocus && !focusState.isFocused)
+                    {
+                        // Focus lost: format now
+                        val formatted = formatToTime(start)
+                        start = formatted
+                        onActivityChange(activity.copy(start = formatted))
+                    }
+                    hasFocus = focusState.isFocused
+                },
+            centerText = true
         )
 
-        Spacer(modifier = Modifier.width(1.dp))
+        Spacer(modifier = Modifier.width(0.dp))
 
         CompactTextField(
             value = end,
@@ -279,11 +374,12 @@ fun ActivityRow(
                 end = it
                 onActivityChange(activity.copy(end = it))
             },
-            modifier = Modifier.weight(0.6f),
-            enabled = false
+            modifier = Modifier.weight(0.5f),
+            enabled = false,
+            centerText = true
         )
 
-        Spacer(modifier = Modifier.width(1.dp))
+        Spacer(modifier = Modifier.width(0.dp))
 
         Box(
             modifier = Modifier
@@ -300,11 +396,14 @@ fun ActivityRow(
                     checked = it
                     onActivityChange(activity.copy(checked = it))
                 },
-                modifier = Modifier.size(14.dp)
+                modifier = Modifier.size(14.dp),
+                colors = CheckboxDefaults.colors(
+                    checkedColor = MaterialTheme.colorScheme.primary,
+                    uncheckedColor = MaterialTheme.colorScheme.outline)
             )
         }
 
-        Spacer(modifier = Modifier.width(1.dp))
+        Spacer(modifier = Modifier.width(0.dp))
 
         Box(
             modifier = Modifier
@@ -322,9 +421,17 @@ fun ActivityRow(
                 Icon(
                     imageVector = Icons.Default.Delete,
                     contentDescription = "Delete Activity",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     modifier = Modifier.size(14.dp)
                 )
             }
         }
     }
+}
+
+fun formatToTime(digits: String): String {
+    val clean = digits.filter { it.isDigit() }.take(4).padEnd(4, '0')
+    val hours = clean.take(2)
+    val minutes = clean.drop(2)
+    return "$hours:$minutes"
 }

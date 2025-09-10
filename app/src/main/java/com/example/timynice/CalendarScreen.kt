@@ -19,26 +19,52 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Surface
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.ui.draw.shadow
+import kotlin.system.exitProcess
+
 @Composable
 fun CalendarScreen(
     calendarViewModel: CalendarViewModel,
     onDayClick: (String) -> Unit
 ) {
     val calendarState by calendarViewModel.calendarState.collectAsState()
-    val SoftBlue = Color(0xFF82B1FF)
+
     Column(modifier = Modifier.padding(16.dp)) {
-        val SoftBlue = Color(0xFF82B1FF) // already defined
-        Text(
-            text = "TimyNice: Your Daily Wins! 😉 📈",
+        /*Text(
+            text = "Consistency is key! 😉 📈",
             style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
             color = MaterialTheme.colorScheme.primary,
-            fontSize = 22.sp, // modify1: smaller, softer
+            fontSize = 25.sp, // modify1: smaller, softer
             modifier = Modifier.padding(bottom = 8.dp)
-        )
+        )*/
+
+        // Top row with title and close button
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Consistency is key! 😉 📈",
+                style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary,
+                fontSize = 25.sp,
+                modifier = Modifier.weight(1f) // Takes available space
+            )
+            IconButton(
+                onClick = { exitProcess(0) }, // Closes the app
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                    contentDescription = "Close App",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
 
         // Header row: Year-Month and monthly accomplishment %
         Row(
@@ -48,9 +74,11 @@ fun CalendarScreen(
         ) {
             Text(
                 text = calendarState.yearMonth.format(DateTimeFormatter.ofPattern("yyyy - MMMM")),
+                fontSize = 22.sp,
                 style = MaterialTheme.typography.headlineMedium
             )
         }
+
         Spacer(modifier = Modifier.height(8.dp))
         // Weekday headers
         Row(
@@ -67,7 +95,6 @@ fun CalendarScreen(
                 )
             }
         }
-
 
         Spacer(modifier = Modifier.height(4.dp))
         // Days grid
@@ -91,7 +118,7 @@ fun CalendarScreen(
                 Box(
                     modifier = Modifier
                         .size(44.dp)
-                        .padding(2.dp)
+                        .padding(horizontal = 2.dp, vertical = 2.dp)
                         .shadow(elevation = if (isToday) 6.dp else 2.dp, shape = RoundedCornerShape(8.dp))
                         .background(
                             color = if (isToday) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
@@ -104,7 +131,7 @@ fun CalendarScreen(
                         text = displayText,
                         fontSize = 11.sp, //10
                         fontWeight = FontWeight.Normal,
-                        color = if (accomplish > 0f) Color.Blue else Color.Black
+                        color = if (accomplish > 0f) Color.Blue else Color.Black,
                     )
                 }
             }
@@ -113,21 +140,12 @@ fun CalendarScreen(
         Column(
             modifier = Modifier.padding(bottom = 8.dp)
         ) {
-            // Top line: Year - month in lowercase
             Text(
-                text = calendarState.yearMonth.format(DateTimeFormatter.ofPattern("yyyy - MMMM")),
-                style = MaterialTheme.typography.titleMedium,
-                fontSize = 25.sp,
-                fontWeight = FontWeight.Normal
-            )
-            Spacer(modifier = Modifier.height(1.dp))
-            // Second line: Motivational phrase with emoji
-            Text(
-                text = "Small Wins, Big Impact!🚀",
+                text = "Dream it, then just get 1% better at it every day!🚀",
                 style = MaterialTheme.typography.titleLarge,
-                fontSize = 18.sp,
+                fontSize = 17.sp,
                 //fontWeight = FontWeight.SemiBold,
-                color = SoftBlue,
+                color = Color.Black//SoftBlue,
             )
         }
         Spacer(modifier = Modifier.height(1.dp))
@@ -147,7 +165,7 @@ fun AccomplishmentChartLine(
         val dayStr = String.format("%04d-%02d-%02d", yearMonth.year, yearMonth.monthValue, day)
         dayAccomplishments[dayStr] ?: 0f
     }
-    val maxHeight = 150.dp // Increased height for y-axis labels
+    val maxHeight = 140.dp // Increased height for y-axis labels
     val yAxisSteps = listOf(100f, 75f, 50f, 25f, 0f) // Y-axis values
     Column(
         modifier = Modifier
