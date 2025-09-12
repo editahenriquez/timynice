@@ -14,3 +14,7 @@
 .cxx
 local.properties
 *.log
+app/release/baselineProfiles/
+app/release/
+app/build/
+*.apk

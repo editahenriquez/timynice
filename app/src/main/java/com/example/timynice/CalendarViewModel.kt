@@ -1,6 +1,5 @@
 package com.example.timynice
 
-
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.timynice.room.AppDatabase

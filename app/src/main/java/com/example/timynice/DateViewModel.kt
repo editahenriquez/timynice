@@ -121,6 +121,7 @@ class DateViewModel(private val database: AppDatabase, val date: String) : ViewM
         viewModelScope.launch {
             database.activityDao().deleteActivity(activity)
             //_activities.value = _activities.value.filter { it.id != activity.id }
+            _activities.value = database.activityDao().getActivitiesForDay(date)
             updateAccomplishment()
         }
     }
