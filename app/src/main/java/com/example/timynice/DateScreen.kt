@@ -8,7 +8,19 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,7 +40,11 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.material3.ExperimentalMaterial3Api
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalendar: () -> Unit) {
     val database = AppDatabase.getDatabase(LocalContext.current)
@@ -38,12 +54,14 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
     val dayMessage by viewModel.dayMessage.collectAsState()
     val accomplishment by viewModel.dateAccomplish.collectAsState()
     var editableMessage by remember { mutableStateOf("") }
+    var pendingDelete by remember { mutableStateOf<ActivityEntity?>(null) }
 
     LaunchedEffect(dayMessage) {
         editableMessage = dayMessage
     }
 
-    Column(modifier = Modifier.padding(16.dp).fillMaxHeight() ) {
+    Box(modifier = Modifier.padding(16.dp).fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize()) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
@@ -119,7 +137,7 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(2f),
+                modifier = Modifier.weight(2.4f),
                 textAlign = TextAlign.Center
             )
             Text(
@@ -147,28 +165,61 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
                 textAlign = TextAlign.Center
             )
             Box(modifier = Modifier.weight(0.4f)) // Placeholder for checkbox
-            Box(modifier = Modifier.weight(0.4f)) // Placeholder for delete button
         }
         Spacer(modifier = Modifier.height(1.8.dp))
 
-        // Activity List
+        // Activity list: swipe-left to delete (Compose SwipeToDismissBox; no RecyclerView/ItemTouchHelper in this app).
+        val layoutDirection = LocalLayoutDirection.current
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
-            itemsIndexed(activities) { index, activity ->
-                ActivityRow(
-                    activity = activity,
-                    onActivityChange = { updated ->
-                        viewModel.insertOrUpdateActivity(updated)
+            itemsIndexed(
+                items = activities,
+                key = { _, item -> item.id }
+            ) { index, activity ->
+                val dismissState = rememberSwipeToDismissBoxState(
+                    confirmValueChange = { target ->
+                        if (target == SwipeToDismissBoxValue.EndToStart) {
+                            pendingDelete = activity
+                            false
+                        } else {
+                            true
+                        }
+                    }
+                )
+                SwipeToDismissBox(
+                    state = dismissState,
+                    enableDismissFromStartToEnd = false,
+                    enableDismissFromEndToStart = true,
+                    backgroundContent = {
+                        val dismissTowardEnd = layoutDirection == LayoutDirection.Ltr
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.errorContainer),
+                            contentAlignment = if (dismissTowardEnd) Alignment.CenterEnd else Alignment.CenterStart
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                        }
                     },
-                    onDelete = {
-                        viewModel.deleteActivity(activity)
-                    },
-                    isFirstRow = (index == 0),
-                    previousEndTime = if (index > 0) activities[index - 1].end else null
+                    content = {
+                        ActivityRow(
+                            activity = activity,
+                            onActivityChange = { updated ->
+                                viewModel.insertOrUpdateActivity(updated)
+                            },
+                            isFirstRow = (index == 0),
+                            previousEndTime = if (index > 0) activities[index - 1].end else null
+                        )
+                    }
                 )
             }
         }
@@ -213,13 +264,31 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
             }
         }
     }
+
+        pendingDelete?.let { target ->
+            AlertDialog(
+                onDismissRequest = { pendingDelete = null },
+                title = { Text("¿Eliminar esta actividad?") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            viewModel.deleteActivity(target)
+                            pendingDelete = null
+                        }
+                    ) { Text("Confirmar") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingDelete = null }) { Text("Cancelar") }
+                }
+            )
+        }
+    }
 }
 
 @Composable
 fun ActivityRow(
     activity: ActivityEntity,
     onActivityChange: (ActivityEntity) -> Unit,
-    onDelete: () -> Unit,
     isFirstRow: Boolean,
     previousEndTime: String?
 ) {
@@ -311,7 +380,7 @@ fun ActivityRow(
                 name = it
                 onActivityChange(activity.copy(name = it))
             },
-            modifier = Modifier.weight(2f)
+            modifier = Modifier.weight(2.4f)
         )
         Spacer(modifier = Modifier.width(0.dp))
 
@@ -391,29 +460,6 @@ fun ActivityRow(
                     checkedColor = MaterialTheme.colorScheme.primary,
                     uncheckedColor = MaterialTheme.colorScheme.outline)
             )
-        }
-        Spacer(modifier = Modifier.width(0.dp))
-
-        Box(
-            modifier = Modifier
-                .weight(0.4f)
-                .height(20.dp)
-                .border(0.1.dp, MaterialTheme.colorScheme.outline)
-                .padding(horizontal = 0.1.dp, vertical = 0.1.dp)
-                .background(MaterialTheme.colorScheme.surface),
-            contentAlignment = Alignment.Center
-        ) {
-            IconButton(
-                onClick = onDelete,
-                modifier = Modifier.size(16.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete Activity",
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    modifier = Modifier.size(14.dp)
-                )
-            }
         }
     }
 }
