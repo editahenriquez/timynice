@@ -14,8 +14,11 @@ interface ActivityDao {
     suspend fun insertActivity(activity: ActivityEntity)
 
     // Get activities for a specific day, ordered by start time
-    @Query("SELECT * FROM activities WHERE dayId = :dayId ORDER BY name asc")//ORDER BY start asc
+    @Query("SELECT * FROM activities WHERE dayId = :dayId ORDER BY start ASC, id ASC")
     suspend fun getActivitiesForDay(dayId: String): List<ActivityEntity>
+
+    @Query("SELECT * FROM activities WHERE substr(dayId, 1, 7) = :yearMonth ORDER BY dayId ASC, start ASC, id ASC")
+    suspend fun getActivitiesForMonth(yearMonth: String): List<ActivityEntity>
 
     // Delete an activity
     @Delete
@@ -26,11 +29,20 @@ interface ActivityDao {
     suspend fun resetActivitiesForDay(dayId: String)
 
     // Get recent activities for a given weekday before currentDate, ordered by most recent date.
-    @Query("""
-    SELECT * FROM activities 
+    /*@Query("""
+    SELECT * FROM activities
     WHERE strftime('%w', dayId) = :weekday 
     AND dayId < :currentDate
-    order by name asc
+    order by dayId desc,name asc
+    """)*/
+    @Query("""
+    SELECT * FROM activities
+    WHERE dayId = (
+        SELECT MAX(dayId) FROM activities
+        WHERE strftime('%w', dayId) = :weekday
+          AND dayId < :currentDate
+    )
+    ORDER BY start ASC, id ASC
     """)
     suspend fun getRecentActivitiesByWeekday(currentDate: String, weekday: String): List<ActivityEntity>
     //ORDER BY start asc

@@ -2,13 +2,20 @@ package com.example.timynice
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.FloatingActionButton
@@ -31,8 +38,11 @@ import androidx.compose.ui.unit.sp
 import com.example.timynice.room.ActivityEntity
 import com.example.timynice.room.AppDatabase
 import kotlinx.coroutines.launch
-import java.time.LocalTime
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
@@ -55,6 +65,20 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
     val accomplishment by viewModel.dateAccomplish.collectAsState()
     var editableMessage by remember { mutableStateOf("") }
     var pendingDelete by remember { mutableStateOf<ActivityEntity?>(null) }
+    var showDuplicateDatePicker by remember { mutableStateOf(false) }
+    val duplicateDatePickerState = rememberDatePickerState()
+    var duplicateSourceIso by remember { mutableStateOf<String?>(null) }
+    var duplicateActivityCount by remember { mutableStateOf(0) }
+    var showDuplicateReplaceConfirm by remember { mutableStateOf(false) }
+    var showDuplicateEmptyMessage by remember { mutableStateOf(false) }
+    var showDeleteAllConfirm by remember { mutableStateOf(false) }
+
+    val dateDisplayFormatter = remember {
+        DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.getDefault())
+    }
+    val destLabel = remember(date, dateDisplayFormatter) {
+        runCatching { LocalDate.parse(date).format(dateDisplayFormatter) }.getOrDefault(date)
+    }
 
     LaunchedEffect(dayMessage) {
         editableMessage = dayMessage
@@ -179,7 +203,7 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
             itemsIndexed(
                 items = activities,
                 key = { _, item -> item.id }
-            ) { index, activity ->
+            ) { _, activity ->
                 val dismissState = rememberSwipeToDismissBoxState(
                     confirmValueChange = { target ->
                         if (target == SwipeToDismissBoxValue.EndToStart) {
@@ -215,9 +239,7 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
                             activity = activity,
                             onActivityChange = { updated ->
                                 viewModel.insertOrUpdateActivity(updated)
-                            },
-                            isFirstRow = (index == 0),
-                            previousEndTime = if (index > 0) activities[index - 1].end else null
+                            }
                         )
                     }
                 )
@@ -252,11 +274,16 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
             Spacer(modifier = Modifier.width(16.dp))
 
             FloatingActionButton(
-                onClick = {
-                    coroutineScope.launch {
-                        viewModel.resetActivities()
-                    }
-                },
+                onClick = { showDuplicateDatePicker = true },
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+            ) {
+                Icon(Icons.Filled.ContentCopy, contentDescription = "Duplicate day from date")
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+
+            FloatingActionButton(
+                onClick = { showDeleteAllConfirm = true },
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer
             ) {
@@ -264,6 +291,35 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
             }
         }
     }
+
+        if (showDeleteAllConfirm) {
+            AlertDialog(
+                onDismissRequest = { showDeleteAllConfirm = false },
+                title = {
+                    Text(
+                        "¿Eliminar todas las actividades del $destLabel?\n\n" +
+                            "Esta acción no se puede deshacer."
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                viewModel.resetActivities()
+                            }
+                            showDeleteAllConfirm = false
+                        }
+                    ) {
+                        Text("Eliminar", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteAllConfirm = false }) {
+                        Text("Cancelar")
+                    }
+                }
+            )
+        }
 
         pendingDelete?.let { target ->
             AlertDialog(
@@ -282,56 +338,127 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
                 }
             )
         }
+
+        if (showDuplicateDatePicker) {
+            DatePickerDialog(
+                onDismissRequest = { showDuplicateDatePicker = false },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            val millis = duplicateDatePickerState.selectedDateMillis ?: return@TextButton
+                            showDuplicateDatePicker = false
+                            // DatePicker millis = UTC midnight for the selected calendar day; use UTC here
+                            // so the source date matches the picker (systemDefault() can shift ±1 day).
+                            val pickedIso = Instant.ofEpochMilli(millis)
+                                .atZone(ZoneOffset.UTC)
+                                .toLocalDate()
+                                .format(DateTimeFormatter.ISO_LOCAL_DATE)
+                            coroutineScope.launch {
+                                val sourceActivities = viewModel.fetchActivitiesForDay(pickedIso)
+                                if (sourceActivities.isEmpty()) {
+                                    showDuplicateEmptyMessage = true
+                                } else {
+                                    duplicateSourceIso = pickedIso
+                                    duplicateActivityCount = sourceActivities.size
+                                    showDuplicateReplaceConfirm = true
+                                }
+                            }
+                        }
+                    ) { Text("Aceptar") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDuplicateDatePicker = false }) { Text("Cancelar") }
+                }
+            ) {
+                DatePicker(state = duplicateDatePickerState)
+            }
+        }
+
+        if (showDuplicateEmptyMessage) {
+            AlertDialog(
+                onDismissRequest = { showDuplicateEmptyMessage = false },
+                confirmButton = {
+                    TextButton(onClick = { showDuplicateEmptyMessage = false }) { Text("OK") }
+                },
+                title = { Text("No hay actividades en esa fecha") }
+            )
+        }
+
+        if (showDuplicateReplaceConfirm) {
+            val sourceIso = duplicateSourceIso
+            val srcLabel = sourceIso?.let {
+                runCatching { LocalDate.parse(it).format(dateDisplayFormatter) }.getOrDefault(it)
+            } ?: ""
+            AlertDialog(
+                onDismissRequest = {
+                    showDuplicateReplaceConfirm = false
+                    duplicateSourceIso = null
+                },
+                title = { Text("Duplicar día") },
+                text = {
+                    Text(
+                        "Se copiarán $duplicateActivityCount actividades desde el $srcLabel hacia el $destLabel (día de esta pantalla).\n\n" +
+                            "Las actividades que ya existían en el $destLabel serán eliminadas. ¿Continuar?"
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            if (sourceIso != null) {
+                                viewModel.applyDuplicateFromSourceDate(sourceIso)
+                            }
+                            showDuplicateReplaceConfirm = false
+                            duplicateSourceIso = null
+                        }
+                    ) { Text("Continuar") }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            showDuplicateReplaceConfirm = false
+                            duplicateSourceIso = null
+                        }
+                    ) { Text("Cancelar") }
+                }
+            )
+        }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ActivityRow(
     activity: ActivityEntity,
     onActivityChange: (ActivityEntity) -> Unit,
-    isFirstRow: Boolean,
-    previousEndTime: String?
 ) {
-    var name by remember { mutableStateOf(activity.name) }
-    var duration by remember { mutableStateOf(activity.duration) }
-    var start by remember { mutableStateOf(activity.start) }
-    //var end by remember { mutableStateOf(activity.end) }
-    var end = activity.end
-    var checked by remember { mutableStateOf(activity.checked) }
-    var skipInitialCalculation by remember { mutableStateOf(true) }
-    var hasFocus by remember { mutableStateOf(false) }
+    var name by remember(activity.id) { mutableStateOf(activity.name) }
+    var duration by remember(activity.id) { mutableStateOf(activity.duration) }
+    var start by remember(activity.id) { mutableStateOf(activity.start) }
+    var checked by remember(activity.id) { mutableStateOf(activity.checked) }
 
-    // Auto-set start if not first row
-    LaunchedEffect(previousEndTime) {
-        if (!isFirstRow && previousEndTime != null && start != previousEndTime) {
-            start = previousEndTime
-            onActivityChange(activity.copy(start = start))
-        }
+    var nameFieldFocused by remember(activity.id) { mutableStateOf(false) }
+    var showDurationTimePicker by remember(activity.id) { mutableStateOf(false) }
+    var showStartTimePicker by remember(activity.id) { mutableStateOf(false) }
+
+    // Sync from ViewModel; skip duration/start while a time picker is open.
+    LaunchedEffect(
+        activity.id,
+        activity.name,
+        activity.start,
+        activity.end,
+        activity.duration,
+        activity.checked,
+        nameFieldFocused,
+        showDurationTimePicker,
+        showStartTimePicker
+    ) {
+        if (!nameFieldFocused) name = activity.name
+        if (!showDurationTimePicker) duration = activity.duration
+        if (!showStartTimePicker) start = activity.start
+        checked = activity.checked
     }
 
-    // Auto-calculate end time
-    LaunchedEffect(start, duration) {
-        if (skipInitialCalculation) {
-            skipInitialCalculation = false
-            return@LaunchedEffect
-        }
-
-        val formatter = DateTimeFormatter.ofPattern("HH:mm")
-        try {
-            val startTime = LocalTime.parse(start, formatter)
-            val formattedDuration = formatToTime(duration)
-            val parts = formattedDuration.split(":").map { it.toIntOrNull() ?: 0 }
-            val durHours = parts.getOrElse(0) { 0 }
-            val durMinutes = parts.getOrElse(1) { 0 }
-            val durTotalSeconds = durHours * 3600 + durMinutes * 60
-            val endTime = startTime.plusSeconds(durTotalSeconds.toLong()).format(formatter)
-            if (activity.end != endTime) {
-                end = endTime // Update the local variable
-                onActivityChange(activity.copy(end = endTime))
-            }
-        } catch (_: Exception) {
-        }
-    }
+    val rowFieldHeight = 20.dp
 
     Row(
         modifier = Modifier
@@ -339,7 +466,8 @@ fun ActivityRow(
             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(5.dp))
             .padding(horizontal = 0.dp, vertical = 0.dp)
             .shadow(2.dp, RoundedCornerShape(5.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(5.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(5.dp)),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         // Reusable compact field builder
         @Composable
@@ -348,14 +476,14 @@ fun ActivityRow(
             onValueChange: (String) -> Unit,
             modifier: Modifier = Modifier,
             enabled: Boolean = true,
-            centerText: Boolean = false
+            centerText: Boolean = false,
         ) {
             Box(
                 modifier = modifier
                     .border(0.1.dp, MaterialTheme.colorScheme.outline, shape = RoundedCornerShape(2.dp))
                     .background(MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(2.dp))
                     .padding(horizontal = 0.1.dp, vertical = 0.1.dp)
-                    .height(20.dp)
+                    .height(rowFieldHeight)
                     .then(if (!enabled) Modifier else Modifier),
                 contentAlignment = Alignment.Center
             ) {
@@ -374,66 +502,64 @@ fun ActivityRow(
             }
         }
 
+        /** hh:mm: same footprint as CompactTextField; Text + clickable (no BasicTextField). */
+        @Composable
+        fun HhMmPickerCell(
+            value: String,
+            modifier: Modifier = Modifier,
+            onClick: () -> Unit,
+        ) {
+            Box(
+                modifier = modifier
+                    .border(0.1.dp, MaterialTheme.colorScheme.outline, shape = RoundedCornerShape(2.dp))
+                    .background(MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(2.dp))
+                    .padding(horizontal = 0.1.dp, vertical = 0.1.dp)
+                    .height(rowFieldHeight)
+                    .clickable(onClick = onClick),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = value,
+                    fontSize = 13.sp,
+                    lineHeight = 14.sp,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
+            }
+        }
+
         CompactTextField(
             value = name,
-            onValueChange = {
-                name = it
-                onActivityChange(activity.copy(name = it))
-            },
-            modifier = Modifier.weight(2.4f)
+            onValueChange = { name = it },
+            modifier = Modifier
+                .weight(2.4f)
+                .onFocusChanged { fs ->
+                    if (nameFieldFocused && !fs.isFocused) {
+                        onActivityChange(activity.copy(name = name))
+                    }
+                    nameFieldFocused = fs.isFocused
+                }
         )
         Spacer(modifier = Modifier.width(0.dp))
 
-        CompactTextField(
+        HhMmPickerCell(
             value = duration,
-            onValueChange = {
-                duration = it
-                onActivityChange(activity.copy(duration = formatToTime(it)))
-            },
-            modifier = Modifier
-                .weight(0.5f)
-                .onFocusChanged { focusState ->
-                    if (hasFocus && !focusState.isFocused)
-                    {
-                        // Focus lost: format now
-                        val formatted = formatToTime(duration)
-                        duration = formatted
-                        onActivityChange(activity.copy(duration = duration))
-                    }
-                    hasFocus = focusState.isFocused
-                },
-            centerText = true,
+            modifier = Modifier.weight(0.5f),
+            onClick = { showDurationTimePicker = true },
         )
         Spacer(modifier = Modifier.width(0.dp))
 
-        CompactTextField(
+        HhMmPickerCell(
             value = start,
-            onValueChange = {
-                start = it
-                onActivityChange(activity.copy(start = formatToTime(it)))
-            },
-            modifier = Modifier
-                .weight(0.5f)
-                .onFocusChanged { focusState ->
-                    if (hasFocus && !focusState.isFocused)
-                    {
-                        // Focus lost: format now
-                        val formatted = formatToTime(start)
-                        start = formatted
-                        onActivityChange(activity.copy(start = start))
-                    }
-                    hasFocus = focusState.isFocused
-                },
-            centerText = true
+            modifier = Modifier.weight(0.5f),
+            onClick = { showStartTimePicker = true },
         )
         Spacer(modifier = Modifier.width(0.dp))
 
         CompactTextField(
-            value = end,
-            onValueChange = {
-                end = it
-                onActivityChange(activity.copy(end = formatToTime(it)))
-            },
+            value = activity.end,
+            onValueChange = { },
             modifier = Modifier.weight(0.5f),
             enabled = false,
             centerText = true
@@ -443,7 +569,7 @@ fun ActivityRow(
         Box(
             modifier = Modifier
                 .weight(0.4f)
-                .height(20.dp)
+                .height(rowFieldHeight)
                 .border(0.1.dp, MaterialTheme.colorScheme.outline)
                 .padding(horizontal = 0.1.dp, vertical = 0.1.dp)
                 .background(MaterialTheme.colorScheme.surface),
@@ -462,6 +588,88 @@ fun ActivityRow(
             )
         }
     }
+
+    if (showDurationTimePicker) {
+        val (ih, im) = parseHourMinuteForPicker(duration)
+        val timeState = rememberTimePickerState(
+            initialHour = ih,
+            initialMinute = im,
+            is24Hour = true,
+        )
+        AlertDialog(
+            onDismissRequest = { showDurationTimePicker = false },
+            title = { Text("Duración (hh:mm)") },
+            text = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    TimePicker(state = timeState)
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val formatted = formatHourMinute(timeState.hour, timeState.minute)
+                        duration = formatted
+                        onActivityChange(
+                            activity.copy(
+                                duration = formatted,
+                                start = formatToTime(start),
+                            )
+                        )
+                        showDurationTimePicker = false
+                    }
+                ) { Text("Aceptar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDurationTimePicker = false }) { Text("Cancelar") }
+            },
+        )
+    }
+
+    if (showStartTimePicker) {
+        val (ih, im) = parseHourMinuteForPicker(start)
+        val timeState = rememberTimePickerState(
+            initialHour = ih,
+            initialMinute = im,
+            is24Hour = true,
+        )
+        AlertDialog(
+            onDismissRequest = { showStartTimePicker = false },
+            title = { Text("Inicio (hh:mm)") },
+            text = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    TimePicker(state = timeState)
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val formatted = formatHourMinute(timeState.hour, timeState.minute)
+                        start = formatted
+                        onActivityChange(
+                            activity.copy(
+                                start = formatted,
+                                duration = formatToTime(duration),
+                            )
+                        )
+                        showStartTimePicker = false
+                    }
+                ) { Text("Aceptar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showStartTimePicker = false }) { Text("Cancelar") }
+            },
+        )
+    }
 }
 
 fun formatToTime(digits: String): String {
@@ -470,3 +678,14 @@ fun formatToTime(digits: String): String {
     val minutes = clean.drop(2)
     return "$hours:$minutes"
 }
+
+/** Parses "H:mm" or "HH:mm" for the Material time picker (hour 0–23). */
+private fun parseHourMinuteForPicker(hhMm: String): Pair<Int, Int> {
+    val parts = hhMm.trim().split(":")
+    val h = parts.getOrNull(0)?.toIntOrNull()?.coerceIn(0, 23) ?: 0
+    val m = parts.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 59) ?: 0
+    return h to m
+}
+
+private fun formatHourMinute(hour: Int, minute: Int): String =
+    "%02d:%02d".format(hour.coerceIn(0, 23), minute.coerceIn(0, 59))

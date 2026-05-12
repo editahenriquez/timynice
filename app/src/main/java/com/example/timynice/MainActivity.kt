@@ -3,6 +3,7 @@ package com.example.timynice
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -44,12 +45,14 @@ fun TimyniceApp(calendarViewModel: CalendarViewModel) {
 
     NavHost(navController = navController, startDestination = "calendar") {
         composable("calendar") {
-            CalendarScreen(
-                calendarViewModel = calendarViewModel,
-                onDayClick = { date ->
-                    navController.navigate("date/$date")
-                }
-            )
+            Box(modifier = Modifier.fillMaxSize()) {
+                CalendarScreen(
+                    calendarViewModel = calendarViewModel,
+                    onDayClick = { date ->
+                        navController.navigate("date/$date")
+                    }
+                )
+            }
         }
 
         composable("date/{date}") { backStackEntry ->

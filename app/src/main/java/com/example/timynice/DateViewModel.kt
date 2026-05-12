@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.util.UUID
 
 class DateViewModel(private val database: AppDatabase, val date: String) : ViewModel() {
 
@@ -38,7 +39,11 @@ class DateViewModel(private val database: AppDatabase, val date: String) : ViewM
 
             val existingActivities = database.activityDao().getActivitiesForDay(date)
             if (existingActivities.isNotEmpty()) {
-                _activities.value = existingActivities
+                val normalized = normalizeActivitiesContinuity(existingActivities)
+                if (normalized != existingActivities) {
+                    normalized.forEach { database.activityDao().insertActivity(it) }
+                }
+                _activities.value = normalized
             } else {
                 // Auto-fill from most recent same weekday
                 val weekday = LocalDate.parse(date).dayOfWeek.value % 7  // 0=Sunday
@@ -47,6 +52,7 @@ class DateViewModel(private val database: AppDatabase, val date: String) : ViewM
                 val recentActivities = database.activityDao()
                     .getRecentActivitiesByWeekday(date, weekdayStr)
                     .groupBy { it.dayId }
+                    .toSortedMap(compareByDescending { it })//
                     .values
                     .firstOrNull()  // Most recent group of same-day activities
 
@@ -58,8 +64,9 @@ class DateViewModel(private val database: AppDatabase, val date: String) : ViewM
                             checked = false
                         )
                     }
-                    copied.forEach { database.activityDao().insertActivity(it) }
-                    _activities.value = copied
+                    val normalized = normalizeActivitiesContinuity(copied)
+                    normalized.forEach { database.activityDao().insertActivity(it) }
+                    _activities.value = database.activityDao().getActivitiesForDay(date)
                 } else {
                     _activities.value = emptyList()
                 }
@@ -69,69 +76,93 @@ class DateViewModel(private val database: AppDatabase, val date: String) : ViewM
         }
     }
 
-    private fun updateAccomplishment() {
-        val acts = _activities.value
-        val total = acts.size
-        val checked = acts.count { it.checked }
-        val acc = if (total == 0) 0f else (checked.toFloat() / total) * 100f
-        _dateAccomplish.value = acc
+        fun updateAccomplishment() {
+            val acts = _activities.value
+            val total = acts.size
+            val checked = acts.count { it.checked }
+            val acc = if (total == 0) 0f else (checked.toFloat() / total) * 100f
+            _dateAccomplish.value = acc
 
-        // Also store in DB
-        viewModelScope.launch {
-            val currentMsg = _dayMessage.value
-            database.dayDao().insertDay(DayEntity(date, currentMsg, acc))  // 🆕
-        }
-    }
-
-    private fun calculateAccomplishment(activities: List<ActivityEntity>) {
-        val total = activities.size
-        val checked = activities.count { it.checked }
-        _dateAccomplish.value = if (total == 0) 0f else (checked.toFloat() / total) * 100f
-    }
-
-    fun updateDayMessage(newMessage: String) {
-        _dayMessage.value = newMessage
-        viewModelScope.launch {
-            val accomplishment = _dateAccomplish.value
-            database.dayDao().insertDay(DayEntity(date, newMessage, accomplishment))
-        }
-    }
-
-
-    fun insertOrUpdateActivity(activity: ActivityEntity) {
-        viewModelScope.launch {
-            database.activityDao().insertActivity(activity)
-
-            // Update local copy immediately
-            val updatedList = _activities.value.toMutableList()
-            val index = updatedList.indexOfFirst { it.id == activity.id }
-
-            if (index != -1) {
-                updatedList[index] = activity
-            } else {
-                updatedList.add(activity)
+            // Also store in DB
+            viewModelScope.launch {
+                val currentMsg = _dayMessage.value
+                database.dayDao().insertDay(DayEntity(date, currentMsg, acc))  // 🆕
             }
+        }
 
-            _activities.value = updatedList
-            updateAccomplishment()
+        fun calculateAccomplishment(activities: List<ActivityEntity>) {
+            val total = activities.size
+            val checked = activities.count { it.checked }
+            _dateAccomplish.value = if (total == 0) 0f else (checked.toFloat() / total) * 100f
+        }
+
+        fun updateDayMessage(newMessage: String) {
+            _dayMessage.value = newMessage
+            viewModelScope.launch {
+                val accomplishment = _dateAccomplish.value
+                database.dayDao().insertDay(DayEntity(date, newMessage, accomplishment))
+            }
+        }
+
+
+        fun insertOrUpdateActivity(activity: ActivityEntity) {
+            viewModelScope.launch {
+                val updatedList = _activities.value.toMutableList()
+                val index = updatedList.indexOfFirst { it.id == activity.id }
+                if (index != -1) {
+                    updatedList[index] = activity
+                } else {
+                    updatedList.add(activity)
+                }
+
+                val normalized = normalizeActivitiesContinuity(updatedList)
+                normalized.forEach { database.activityDao().insertActivity(it) }
+                _activities.value = normalized
+                updateAccomplishment()
+            }
+        }
+
+        fun deleteActivity(activity: ActivityEntity) {
+            viewModelScope.launch {
+                database.activityDao().deleteActivity(activity)
+                //_activities.value = _activities.value.filter { it.id != activity.id }
+                _activities.value = database.activityDao().getActivitiesForDay(date)
+                updateAccomplishment()
+            }
+        }
+
+        fun resetActivities() {
+            viewModelScope.launch {
+                database.activityDao().resetActivitiesForDay(date)
+                _activities.value = database.activityDao().getActivitiesForDay(date)
+                updateAccomplishment()
+            }
+        }
+
+        suspend fun fetchActivitiesForDay(dayId: String): List<ActivityEntity> =
+            database.activityDao().getActivitiesForDay(dayId)
+
+        fun applyDuplicateFromSourceDate(sourceDateIso: String) {
+            viewModelScope.launch {
+                val source = database.activityDao().getActivitiesForDay(sourceDateIso)
+                if (source.isEmpty()) return@launch
+
+                database.activityDao().resetActivitiesForDay(date)
+                val copies = source.map { src ->
+                    ActivityEntity(
+                        id = UUID.randomUUID().toString(),
+                        dayId = date,
+                        name = src.name,
+                        duration = src.duration,
+                        start = src.start,
+                        end = src.end,
+                        checked = false
+                    )
+                }
+                val normalized = normalizeActivitiesContinuity(copies)
+                normalized.forEach { database.activityDao().insertActivity(it) }
+                _activities.value = database.activityDao().getActivitiesForDay(date)
+                updateAccomplishment()
+            }
         }
     }
-
-    fun deleteActivity(activity: ActivityEntity) {
-        viewModelScope.launch {
-            database.activityDao().deleteActivity(activity)
-            //_activities.value = _activities.value.filter { it.id != activity.id }
-            _activities.value = database.activityDao().getActivitiesForDay(date)
-            updateAccomplishment()
-        }
-    }
-
-    fun resetActivities() {
-        viewModelScope.launch {
-            database.activityDao().resetActivitiesForDay(date)
-            _activities.value = database.activityDao().getActivitiesForDay(date)
-            updateAccomplishment()
-        }
-    }
-
-}
