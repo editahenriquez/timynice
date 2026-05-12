@@ -20,15 +20,16 @@ private fun durationToSeconds(duration: String): Long {
 private fun formatTime(t: LocalTime): String = t.format(timeFormatter)
 
 /**
- * Sorts by start time ascending, then [ActivityEntity.id] for stable ordering.
+ * Sorts by start time ascending (stable: equal starts keep input order).
  * Enforces strict continuity: for every row after the first, start == previous end;
  * each end == start + duration. The first row keeps its (merged) start time as the chain anchor.
  */
 fun normalizeActivitiesContinuity(activities: List<ActivityEntity>): List<ActivityEntity> {
     if (activities.isEmpty()) return emptyList()
+    // Stable sort by start only: ties keep list order so a row appended at the end
+    // (e.g. new activity with same start as previous end / zero duration) stays last.
     val sorted = activities.sortedWith(
-        compareBy<ActivityEntity>({ parseLocalTimeOrMidnight(it.start) })
-            .thenBy { it.id }
+        compareBy<ActivityEntity> { parseLocalTimeOrMidnight(it.start) },
     )
     val out = ArrayList<ActivityEntity>(sorted.size)
     var prevEnd: LocalTime? = null

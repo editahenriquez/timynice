@@ -194,12 +194,13 @@ private fun ActivityConsistencyKpiArea(
                 append("Consistencia (%) = días en que la actividad está marcada (completada) ÷ ")
                 append(
                     if (isCurrentMonth) {
-                        "días del mes hasta hoy × 100. "
+                        "días del mes hasta hoy en que la actividad está registrada × 100. "
                     } else {
-                        "días del mes × 100. "
+                        "días del mes en que la actividad está registrada × 100. "
                     }
                 )
-                append("Un día cuenta si al menos una fila de esa actividad tiene el check ese día.")
+                append("Numerador: día con check en al menos una fila de esa actividad. ")
+                append("Denominador: día con al menos una fila de esa actividad (registrada), dentro del mismo período.")
             },
             fontSize = 11.sp,
             color = MaterialTheme.colorScheme.outline,
@@ -251,7 +252,7 @@ private fun ActivityConsistencyKpiArea(
                             maxLines = 2,
                         )
                         Text(
-                            text = "${row.distinctCheckedDays}/${row.denominatorDays} días ✓",
+                            text = "${row.distinctCheckedDays}/${row.denominatorDays} marcados / con registro",
                             fontSize = 10.sp,
                             color = MaterialTheme.colorScheme.outline,
                         )

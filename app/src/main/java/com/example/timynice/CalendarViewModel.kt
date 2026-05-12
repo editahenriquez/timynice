@@ -13,11 +13,14 @@ import java.time.format.DateTimeFormatter
 
 data class ActivityConsistencyKpi(
     val displayName: String,
-    /** Distinct days in the month where at least one row of this activity is checked (completed). */
+    /** Distinct days in the window where at least one row of this activity is checked (completed). */
     val distinctCheckedDays: Int,
-    /** Denominator: full month (past), or 1…today (current month); ≥1. */
+    /**
+     * Distinct days in the month through today where this activity has any row (registered),
+     * intersected with the same calendar window as the KPI (past month = full month).
+     */
     val denominatorDays: Int,
-    /** distinctCheckedDays / denominatorDays × 100 */
+    /** distinctCheckedDays / denominatorDays × 100; 0% if denominatorDays == 0. */
     val consistencyPercent: Float,
 )
 
@@ -51,7 +54,8 @@ class CalendarViewModel(private val database: AppDatabase) : ViewModel() {
             val denominatorDays = eligibleDaysForConsistencyDenominator(yearMonth, LocalDate.now())
             val (daysWithAnyActivity, consistencyRows) = buildActivityConsistencyKpis(
                 monthActivities,
-                denominatorDays,
+                yearMonth,
+                LocalDate.now(),
             )
 
             _calendarState.value = CalendarState(
@@ -83,12 +87,30 @@ class CalendarViewModel(private val database: AppDatabase) : ViewModel() {
             return denom.coerceAtLeast(1)
         }
 
+        /** Inclusive range of dates that count for “month through today” KPIs. Empty if the month is entirely in the future. */
+        private fun consistencyKpiDateWindow(yearMonth: YearMonth, today: LocalDate): ClosedRange<LocalDate>? {
+            val start = yearMonth.atDay(1)
+            val endOfMonth = yearMonth.atEndOfMonth()
+            val end = minOf(endOfMonth, today)
+            return if (end.isBefore(start)) null else start..end
+        }
+
+        private fun LocalDate.isInKpiWindow(window: ClosedRange<LocalDate>?): Boolean =
+            window != null && this in window
+
         private fun buildActivityConsistencyKpis(
             activities: List<ActivityEntity>,
-            denominatorDays: Int,
+            yearMonth: YearMonth,
+            today: LocalDate,
         ): Pair<Int, List<ActivityConsistencyKpi>> {
             if (activities.isEmpty()) return 0 to emptyList()
-            val daysWithAnyActivity = activities.map { it.dayId }.distinct().size
+            val window = consistencyKpiDateWindow(yearMonth, today)
+            val daysWithAnyActivity = activities
+                .mapNotNull { runCatching { LocalDate.parse(it.dayId) }.getOrNull() }
+                .filter { it.isInKpiWindow(window) }
+                .distinct()
+                .size
+            val registeredDayIdsByNameKey = linkedMapOf<String, MutableSet<String>>()
             val checkedDayIdsByNameKey = linkedMapOf<String, MutableSet<String>>()
             val labelByKey = linkedMapOf<String, String>()
             for (a in activities) {
@@ -96,17 +118,21 @@ class CalendarViewModel(private val database: AppDatabase) : ViewModel() {
                 val key = raw.lowercase()
                 if (key.isEmpty()) continue
                 if (!labelByKey.containsKey(key)) labelByKey[key] = raw
+                val day = runCatching { LocalDate.parse(a.dayId) }.getOrNull() ?: continue
+                if (!day.isInKpiWindow(window)) continue
+                registeredDayIdsByNameKey.getOrPut(key) { mutableSetOf() }.add(a.dayId)
                 if (a.checked) {
                     checkedDayIdsByNameKey.getOrPut(key) { mutableSetOf() }.add(a.dayId)
                 }
             }
             val rows = labelByKey.keys.map { key ->
+                val denom = registeredDayIdsByNameKey[key]?.size ?: 0
                 val checkedDays = checkedDayIdsByNameKey[key]?.size ?: 0
-                val pct = checkedDays * 100f / denominatorDays.toFloat().coerceAtLeast(1f)
+                val pct = if (denom == 0) 0f else checkedDays * 100f / denom.toFloat()
                 ActivityConsistencyKpi(
                     displayName = labelByKey[key] ?: key,
                     distinctCheckedDays = checkedDays,
-                    denominatorDays = denominatorDays,
+                    denominatorDays = denom,
                     consistencyPercent = pct,
                 )
             }.sortedWith(
@@ -124,9 +150,9 @@ data class CalendarState constructor(
     val days: List<String> = emptyList(),
     val dayAccomplishments: Map<String, Float> = emptyMap(),
     val calAccomplish: Float = 0f,
-    /** Distinct days in the month with ≥1 activity row (any name). */
+    /** Distinct days in the KPI window (month through today) with ≥1 activity row (any name). */
     val daysWithAnyActivityInMonth: Int = 0,
-    /** Same denominator used for consistency % (see [CalendarViewModel.eligibleDaysForConsistencyDenominator]). */
+    /** Calendar days in the month through today (past month = full length); used for the “días con registro / …” summary line. */
     val consistencyDenominatorDays: Int = 31,
     val activityConsistency: List<ActivityConsistencyKpi> = emptyList(),
 )

@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -37,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.timynice.room.ActivityEntity
 import com.example.timynice.room.AppDatabase
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -49,6 +51,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
@@ -72,6 +76,9 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
     var showDuplicateReplaceConfirm by remember { mutableStateOf(false) }
     var showDuplicateEmptyMessage by remember { mutableStateOf(false) }
     var showDeleteAllConfirm by remember { mutableStateOf(false) }
+    var showDeleteAllEmptyMessage by remember { mutableStateOf(false) }
+    var focusActivityId by remember { mutableStateOf<String?>(null) }
+    val activityListState = rememberLazyListState()
 
     val dateDisplayFormatter = remember {
         DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.getDefault())
@@ -82,6 +89,14 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
 
     LaunchedEffect(dayMessage) {
         editableMessage = dayMessage
+    }
+
+    LaunchedEffect(focusActivityId, activities) {
+        val id = focusActivityId ?: return@LaunchedEffect
+        val idx = activities.indexOfFirst { it.id == id }
+        if (idx >= 0) {
+            activityListState.animateScrollToItem(idx)
+        }
     }
 
     Box(modifier = Modifier.padding(16.dp).fillMaxSize()) {
@@ -142,13 +157,6 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
         )
         Spacer(modifier = Modifier.height(2.dp))
 
-        Text(
-            text = "Format: hh:mm (e.g., 1 ->10:00, 12 ->12:00, 123 →12:30, 1235 ->12:35)",
-            fontSize = 11.sp,
-            color = MaterialTheme.colorScheme.outline,
-        )
-        Spacer(modifier = Modifier.height(1.5.dp))
-
         // Header row for field labels
         Row(
             modifier = Modifier
@@ -195,6 +203,7 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
         // Activity list: swipe-left to delete (Compose SwipeToDismissBox; no RecyclerView/ItemTouchHelper in this app).
         val layoutDirection = LocalLayoutDirection.current
         LazyColumn(
+            state = activityListState,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
@@ -239,7 +248,9 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
                             activity = activity,
                             onActivityChange = { updated ->
                                 viewModel.insertOrUpdateActivity(updated)
-                            }
+                            },
+                            requestFocusOnActivityName = focusActivityId == activity.id,
+                            onActivityNameFocusConsumed = { focusActivityId = null },
                         )
                     }
                 )
@@ -253,18 +264,10 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
         )  {
             FloatingActionButton(
                 onClick = {
-                    val newStart = if (activities.isNotEmpty()) {
-                        activities.last().end
-                    } else "00:00"
-                    val newActivity = ActivityEntity(
-                        dayId = date,
-                        name = "",
-                        duration = "00:00",
-                        start = newStart,
-                        end = newStart,
-                        checked = false
-                    )
-                    viewModel.insertOrUpdateActivity(newActivity)
+                    coroutineScope.launch {
+                        val newId = viewModel.appendEmptyActivity()
+                        focusActivityId = newId
+                    }
                 },
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -283,7 +286,13 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
             Spacer(modifier = Modifier.width(16.dp))
 
             FloatingActionButton(
-                onClick = { showDeleteAllConfirm = true },
+                onClick = {
+                    if (activities.isEmpty()) {
+                        showDeleteAllEmptyMessage = true
+                    } else {
+                        showDeleteAllConfirm = true
+                    }
+                },
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer
             ) {
@@ -305,9 +314,10 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
                     TextButton(
                         onClick = {
                             coroutineScope.launch {
-                                viewModel.resetActivities()
+                                viewModel.resetAllActivitiesExclusive()
+                                focusActivityId = null
+                                showDeleteAllConfirm = false
                             }
-                            showDeleteAllConfirm = false
                         }
                     ) {
                         Text("Eliminar", color = MaterialTheme.colorScheme.error)
@@ -318,6 +328,21 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
                         Text("Cancelar")
                     }
                 }
+            )
+        }
+
+        if (showDeleteAllEmptyMessage) {
+            AlertDialog(
+                onDismissRequest = { showDeleteAllEmptyMessage = false },
+                title = { Text("Sin actividades") },
+                text = {
+                    Text("No hay actividades registradas en el $destLabel para eliminar.")
+                },
+                confirmButton = {
+                    TextButton(onClick = { showDeleteAllEmptyMessage = false }) {
+                        Text("OK")
+                    }
+                },
             )
         }
 
@@ -430,6 +455,8 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
 fun ActivityRow(
     activity: ActivityEntity,
     onActivityChange: (ActivityEntity) -> Unit,
+    requestFocusOnActivityName: Boolean = false,
+    onActivityNameFocusConsumed: () -> Unit = {},
 ) {
     var name by remember(activity.id) { mutableStateOf(activity.name) }
     var duration by remember(activity.id) { mutableStateOf(activity.duration) }
@@ -439,6 +466,15 @@ fun ActivityRow(
     var nameFieldFocused by remember(activity.id) { mutableStateOf(false) }
     var showDurationTimePicker by remember(activity.id) { mutableStateOf(false) }
     var showStartTimePicker by remember(activity.id) { mutableStateOf(false) }
+    val nameFocusRequester = remember(activity.id) { FocusRequester() }
+
+    LaunchedEffect(requestFocusOnActivityName, activity.id) {
+        if (requestFocusOnActivityName) {
+            delay(200)
+            runCatching { nameFocusRequester.requestFocus() }
+            onActivityNameFocusConsumed()
+        }
+    }
 
     // Sync from ViewModel; skip duration/start while a time picker is open.
     LaunchedEffect(
@@ -533,6 +569,7 @@ fun ActivityRow(
             value = name,
             onValueChange = { name = it },
             modifier = Modifier
+                .focusRequester(nameFocusRequester)
                 .weight(2.4f)
                 .onFocusChanged { fs ->
                     if (nameFieldFocused && !fs.isFocused) {
