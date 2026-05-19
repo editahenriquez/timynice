@@ -16,23 +16,49 @@ class ExampleUnitTest {
     }
 
     @Test
-    fun normalize_snaps_gap_sleep_start_to_previous_end() {
-        val funA = ActivityEntity(
-            id = "1", dayId = "2026-05-11", name = "Fun",
-            duration = "00:40", start = "04:00", end = "04:40"
+    fun normalize_first_row_is_anchor_others_chain_without_reordering_by_start() {
+        val piano = ActivityEntity(
+            id = "1", dayId = "2026-05-11", name = "play piano",
+            duration = "01:00", start = "06:00", end = "07:00",
         )
-        val eat = ActivityEntity(
-            id = "2", dayId = "2026-05-11", name = "Eat",
-            duration = "00:20", start = "04:40", end = "05:00"
+        val german = ActivityEntity(
+            id = "2", dayId = "2026-05-11", name = "learn german",
+            duration = "00:30", start = "07:00", end = "07:30",
         )
-        val sleep = ActivityEntity(
-            id = "3", dayId = "2026-05-11", name = "Sleep",
-            duration = "00:20", start = "05:10", end = "05:30"
+        val read = ActivityEntity(
+            id = "3", dayId = "2026-05-11", name = "read ai",
+            duration = "00:30", start = "07:30", end = "08:00",
         )
-        val out = normalizeActivitiesContinuity(listOf(sleep, funA, eat))
-        assertEquals("04:00", out[0].start)
-        assertEquals("04:40", out[1].start)
-        assertEquals("05:00", out[2].start)
-        assertEquals("05:20", out[2].end)
+        val run = ActivityEntity(
+            id = "4", dayId = "2026-05-11", name = "run 5k",
+            duration = "00:45", start = "08:00", end = "08:45",
+        )
+        // Scenario 1: run 5k dragged to top — anchor is run's original start
+        val scenario1 = normalizeActivitiesContinuity(listOf(run, piano, german, read))
+        assertEquals(
+            listOf("run 5k", "play piano", "learn german", "read ai"),
+            scenario1.map { it.name },
+        )
+        assertEquals("08:00", scenario1[0].start)
+        assertEquals("08:45", scenario1[1].start)
+        assertEquals("09:45", scenario1[2].start)
+        assertEquals("10:15", scenario1[3].start)
+
+        // Scenario 2: learn german second (after run)
+        val scenario2 = normalizeActivitiesContinuity(listOf(run, german, piano, read))
+        assertEquals(
+            listOf("run 5k", "learn german", "play piano", "read ai"),
+            scenario2.map { it.name },
+        )
+        assertEquals("08:45", scenario2[1].start)
+
+        // Scenario 3: play piano at end
+        val scenario3 = normalizeActivitiesContinuity(listOf(run, german, read, piano))
+        assertEquals(
+            listOf("run 5k", "learn german", "read ai", "play piano"),
+            scenario3.map { it.name },
+        )
+        assertEquals("09:45", scenario3[2].end)
+        assertEquals("09:45", scenario3[3].start)
     }
 }

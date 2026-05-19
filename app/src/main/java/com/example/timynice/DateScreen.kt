@@ -3,6 +3,13 @@ package com.example.timynice
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -33,7 +40,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.timynice.room.ActivityEntity
@@ -48,7 +58,12 @@ import java.util.Locale
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DragHandle
+import kotlin.math.roundToInt
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.focus.FocusRequester
@@ -79,6 +94,23 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
     var showDeleteAllEmptyMessage by remember { mutableStateOf(false) }
     var focusActivityId by remember { mutableStateOf<String?>(null) }
     val activityListState = rememberLazyListState()
+    var displayActivities by remember { mutableStateOf<List<ActivityEntity>>(emptyList()) }
+    var isDraggingReorder by remember { mutableStateOf(false) }
+    var draggedActivityId by remember { mutableStateOf<String?>(null) }
+    var dropTargetIndex by remember { mutableIntStateOf(-1) }
+    var dragVisualOffsetPx by remember { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
+    val activityRowHeightPx = remember(density) { with(density) { 28.dp.toPx() } }
+    val reorderSizeSpring = spring<IntSize>(
+        dampingRatio = Spring.DampingRatioNoBouncy,
+        stiffness = Spring.StiffnessMedium,
+    )
+
+    LaunchedEffect(activities) {
+        if (!isDraggingReorder) {
+            displayActivities = activities
+        }
+    }
 
     val dateDisplayFormatter = remember {
         DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.getDefault())
@@ -164,6 +196,7 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
                 .padding(bottom = 1.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
+            Box(modifier = Modifier.width(28.dp))
             Text(
                 text = "Activity",
                 fontSize = 12.sp,
@@ -210,9 +243,26 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
             itemsIndexed(
-                items = activities,
-                key = { _, item -> item.id }
-            ) { _, activity ->
+                items = displayActivities,
+                key = { _, item -> item.id },
+            ) { index, activity ->
+                val isDragged = draggedActivityId == activity.id
+                val showDropLine = draggedActivityId != null && dropTargetIndex == index
+                val rowAlpha by animateFloatAsState(
+                    targetValue = when {
+                        isDragged -> 0.9f
+                        draggedActivityId != null -> 0.98f
+                        else -> 1f
+                    },
+                    animationSpec = tween(200),
+                    label = "rowAlpha",
+                )
+                val rowShadow by animateDpAsState(
+                    targetValue = if (isDragged) 5.dp else 0.dp,
+                    animationSpec = tween(200),
+                    label = "rowShadow",
+                )
+                var dragStepAccumulatedPx by remember(activity.id) { mutableFloatStateOf(0f) }
                 val dismissState = rememberSwipeToDismissBoxState(
                     confirmValueChange = { target ->
                         if (target == SwipeToDismissBoxValue.EndToStart) {
@@ -221,39 +271,141 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
                         } else {
                             true
                         }
-                    }
+                    },
                 )
-                SwipeToDismissBox(
-                    state = dismissState,
-                    enableDismissFromStartToEnd = false,
-                    enableDismissFromEndToStart = true,
-                    backgroundContent = {
-                        val dismissTowardEnd = layoutDirection == LayoutDirection.Ltr
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .animateContentSize(animationSpec = reorderSizeSpring)
+                        .zIndex(if (isDragged) 1f else 0f),
+                ) {
+                    if (showDropLine) {
                         Box(
                             Modifier
-                                .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.errorContainer),
-                            contentAlignment = if (dismissTowardEnd) Alignment.CenterEnd else Alignment.CenterStart
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onErrorContainer,
-                                modifier = Modifier.padding(horizontal = 16.dp)
-                            )
-                        }
-                    },
-                    content = {
-                        ActivityRow(
-                            activity = activity,
-                            onActivityChange = { updated ->
-                                viewModel.insertOrUpdateActivity(updated)
-                            },
-                            requestFocusOnActivityName = focusActivityId == activity.id,
-                            onActivityNameFocusConsumed = { focusActivityId = null },
+                                .fillMaxWidth()
+                                .height(2.dp)
+                                .background(View2Colors.dropLine),
                         )
                     }
-                )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .graphicsLayer {
+                                translationY = if (isDragged) dragVisualOffsetPx else 0f
+                            }
+                            .alpha(rowAlpha)
+                            .then(
+                                if (isDragged) {
+                                    Modifier.shadow(rowShadow, RoundedCornerShape(5.dp), clip = false)
+                                } else {
+                                    Modifier
+                                },
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(28.dp)
+                                .height(28.dp)
+                                .pointerInput(activity.id, displayActivities.size) {
+                                    detectDragGesturesAfterLongPress(
+                                        onDragStart = {
+                                            isDraggingReorder = true
+                                            draggedActivityId = activity.id
+                                            dragVisualOffsetPx = 0f
+                                            dragStepAccumulatedPx = 0f
+                                            dropTargetIndex =
+                                                displayActivities.indexOfFirst { it.id == activity.id }
+                                        },
+                                        onDrag = { change, dragAmount ->
+                                            change.consume()
+                                            dragVisualOffsetPx += dragAmount.y
+                                            dragStepAccumulatedPx += dragAmount.y
+                                            val steps = (dragStepAccumulatedPx / activityRowHeightPx).roundToInt()
+                                            if (steps == 0) return@detectDragGesturesAfterLongPress
+                                            val currentIndex =
+                                                displayActivities.indexOfFirst { it.id == activity.id }
+                                            if (currentIndex < 0) return@detectDragGesturesAfterLongPress
+                                            val newIndex = (currentIndex + steps)
+                                                .coerceIn(0, displayActivities.lastIndex)
+                                            if (newIndex != currentIndex) {
+                                                val mut = displayActivities.toMutableList()
+                                                val moved = mut.removeAt(currentIndex)
+                                                mut.add(newIndex, moved)
+                                                displayActivities = mut
+                                                dragStepAccumulatedPx -= steps * activityRowHeightPx
+                                                dropTargetIndex = newIndex
+                                            }
+                                        },
+                                        onDragEnd = {
+                                            dragStepAccumulatedPx = 0f
+                                            dragVisualOffsetPx = 0f
+                                            draggedActivityId = null
+                                            dropTargetIndex = -1
+                                            isDraggingReorder = false
+                                            coroutineScope.launch {
+                                                viewModel.applyActivityOrder(displayActivities)
+                                            }
+                                        },
+                                        onDragCancel = {
+                                            dragStepAccumulatedPx = 0f
+                                            dragVisualOffsetPx = 0f
+                                            draggedActivityId = null
+                                            dropTargetIndex = -1
+                                            isDraggingReorder = false
+                                            displayActivities = activities
+                                        },
+                                    )
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DragHandle,
+                                contentDescription = "Reordenar",
+                                tint = if (isDragged) {
+                                    View2Colors.dropLine
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                                },
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                        SwipeToDismissBox(
+                            modifier = Modifier.weight(1f),
+                            state = dismissState,
+                            enableDismissFromStartToEnd = false,
+                            enableDismissFromEndToStart = true,
+                            backgroundContent = {
+                                val dismissTowardEnd = layoutDirection == LayoutDirection.Ltr
+                                Box(
+                                    Modifier
+                                        .fillMaxSize()
+                                        .background(MaterialTheme.colorScheme.errorContainer),
+                                    contentAlignment = if (dismissTowardEnd) Alignment.CenterEnd else Alignment.CenterStart,
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                                        modifier = Modifier.padding(horizontal = 16.dp),
+                                    )
+                                }
+                            },
+                            content = {
+                                ActivityRow(
+                                    activity = activity,
+                                    rowIndex = index,
+                                    isDragged = isDragged,
+                                    onActivityChange = { updated ->
+                                        viewModel.insertOrUpdateActivity(updated)
+                                    },
+                                    requestFocusOnActivityName = focusActivityId == activity.id,
+                                    onActivityNameFocusConsumed = { focusActivityId = null },
+                                )
+                            },
+                        )
+                    }
+                }
             }
         }
         Spacer(modifier = Modifier.height(4.dp))
@@ -455,6 +607,8 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
 fun ActivityRow(
     activity: ActivityEntity,
     onActivityChange: (ActivityEntity) -> Unit,
+    rowIndex: Int = 0,
+    isDragged: Boolean = false,
     requestFocusOnActivityName: Boolean = false,
     onActivityNameFocusConsumed: () -> Unit = {},
 ) {
@@ -499,10 +653,11 @@ fun ActivityRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(5.dp))
-            .padding(horizontal = 0.dp, vertical = 0.dp)
-            .shadow(2.dp, RoundedCornerShape(5.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(5.dp)),
+            .background(View2Colors.stripeForIndex(rowIndex), RoundedCornerShape(5.dp))
+            .then(
+                if (!isDragged) Modifier.shadow(2.dp, RoundedCornerShape(5.dp))
+                else Modifier,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Reusable compact field builder

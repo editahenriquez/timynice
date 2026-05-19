@@ -20,20 +20,19 @@ private fun durationToSeconds(duration: String): Long {
 private fun formatTime(t: LocalTime): String = t.format(timeFormatter)
 
 /**
- * Sorts by start time ascending (stable: equal starts keep input order).
- * Enforces strict continuity: for every row after the first, start == previous end;
- * each end == start + duration. The first row keeps its (merged) start time as the chain anchor.
+ * Recomputes a gapless timeline in the given list order (no reordering by start time).
+ *
+ * - First row: anchor — keeps its current [ActivityEntity.start] as the chain origin.
+ * - Every other row: start = previous row's end; end = start + duration.
+ *
+ * Used after manual drag-and-drop; persisted start/end values imply display order on reload
+ * (activities are loaded ORDER BY start ASC).
  */
 fun normalizeActivitiesContinuity(activities: List<ActivityEntity>): List<ActivityEntity> {
     if (activities.isEmpty()) return emptyList()
-    // Stable sort by start only: ties keep list order so a row appended at the end
-    // (e.g. new activity with same start as previous end / zero duration) stays last.
-    val sorted = activities.sortedWith(
-        compareBy<ActivityEntity> { parseLocalTimeOrMidnight(it.start) },
-    )
-    val out = ArrayList<ActivityEntity>(sorted.size)
+    val out = ArrayList<ActivityEntity>(activities.size)
     var prevEnd: LocalTime? = null
-    sorted.forEachIndexed { index, act ->
+    activities.forEachIndexed { index, act ->
         val startTime = if (index == 0) {
             parseLocalTimeOrMidnight(act.start)
         } else {
@@ -43,8 +42,8 @@ fun normalizeActivitiesContinuity(activities: List<ActivityEntity>): List<Activi
         out.add(
             act.copy(
                 start = formatTime(startTime),
-                end = formatTime(endTime)
-            )
+                end = formatTime(endTime),
+            ),
         )
         prevEnd = endTime
     }

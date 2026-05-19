@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.time.LocalDate
 import java.util.UUID
 
 class DateViewModel(private val database: AppDatabase, val date: String) : ViewModel() {
@@ -51,30 +50,8 @@ class DateViewModel(private val database: AppDatabase, val date: String) : ViewM
                     }
                     _activities.value = normalized
                 } else {
-                    val weekday = LocalDate.parse(date).dayOfWeek.value % 7
-                    val weekdayStr = weekday.toString()
-
-                    val recentActivities = database.activityDao()
-                        .getRecentActivitiesByWeekday(date, weekdayStr)
-                        .groupBy { it.dayId }
-                        .toSortedMap(compareByDescending { it })
-                        .values
-                        .firstOrNull()
-
-                    if (recentActivities != null) {
-                        val copied = recentActivities.map {
-                            it.copy(
-                                id = UUID.randomUUID().toString(),
-                                dayId = date,
-                                checked = false,
-                            )
-                        }
-                        val normalized = normalizeActivitiesContinuity(copied)
-                        normalized.forEach { database.activityDao().insertActivity(it) }
-                        _activities.value = database.activityDao().getActivitiesForDay(date)
-                    } else {
-                        _activities.value = emptyList()
-                    }
+                    // New day with no saved activities: leave empty (user adds rows or duplicates).
+                    _activities.value = emptyList()
                 }
 
                 updateAccomplishment()
@@ -128,10 +105,7 @@ class DateViewModel(private val database: AppDatabase, val date: String) : ViewM
                 }
                 working[index] = activity
 
-                val normalized = normalizeActivitiesContinuity(working)
-                normalized.forEach { database.activityDao().insertActivity(it) }
-                _activities.value = database.activityDao().getActivitiesForDay(date)
-                updateAccomplishment()
+                persistNormalizedActivities(working)
             }
         }
     }
@@ -164,8 +138,7 @@ class DateViewModel(private val database: AppDatabase, val date: String) : ViewM
      */
     suspend fun appendEmptyActivity(): String {
         return activityMutationMutex.withLock {
-            val fromDb = database.activityDao().getActivitiesForDay(date)
-            val chain = normalizeActivitiesContinuity(fromDb)
+            val chain = normalizeActivitiesContinuity(_activities.value)
             val newStart = chain.lastOrNull()?.end ?: "00:00"
             val newId = UUID.randomUUID().toString()
             val tail = ActivityEntity(
@@ -177,13 +150,29 @@ class DateViewModel(private val database: AppDatabase, val date: String) : ViewM
                 end = newStart,
                 checked = false,
             )
-            val merged = chain + tail
-            val normalized = normalizeActivitiesContinuity(merged)
-            normalized.forEach { database.activityDao().insertActivity(it) }
-            _activities.value = database.activityDao().getActivitiesForDay(date)
-            updateAccomplishment()
+            persistNormalizedActivities(chain + tail)
             newId
         }
+    }
+
+    /**
+     * Applies a user-defined row order from drag-and-drop, then recalculates the gapless timeline.
+     * Order is persisted only via updated start/end times (no extra DB columns).
+     */
+    suspend fun applyActivityOrder(ordered: List<ActivityEntity>) {
+        if (ordered.isEmpty()) return
+        activityMutationMutex.withLock {
+            val byId = _activities.value.associateBy { it.id }
+            val merged = ordered.map { byId[it.id] ?: it }
+            persistNormalizedActivities(merged)
+        }
+    }
+
+    private suspend fun persistNormalizedActivities(ordered: List<ActivityEntity>) {
+        val normalized = normalizeActivitiesContinuity(ordered)
+        normalized.forEach { database.activityDao().insertActivity(it) }
+        _activities.value = normalized
+        updateAccomplishment()
     }
 
     suspend fun fetchActivitiesForDay(dayId: String): List<ActivityEntity> =
@@ -207,10 +196,7 @@ class DateViewModel(private val database: AppDatabase, val date: String) : ViewM
                         checked = false,
                     )
                 }
-                val normalized = normalizeActivitiesContinuity(copies)
-                normalized.forEach { database.activityDao().insertActivity(it) }
-                _activities.value = database.activityDao().getActivitiesForDay(date)
-                updateAccomplishment()
+                persistNormalizedActivities(copies)
             }
         }
     }

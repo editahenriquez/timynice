@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.time.LocalDate
@@ -182,57 +183,52 @@ private fun ActivityConsistencyKpiArea(
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = "Días con algún registro este mes: ${calendarState.daysWithAnyActivityInMonth}/$denom",
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = buildString {
-                append("Consistencia (%) = días en que la actividad está marcada (completada) ÷ ")
-                append(
-                    if (isCurrentMonth) {
-                        "días del mes hasta hoy en que la actividad está registrada × 100. "
-                    } else {
-                        "días del mes en que la actividad está registrada × 100. "
-                    }
-                )
-                append("Numerador: día con check en al menos una fila de esa actividad. ")
-                append("Denominador: día con al menos una fila de esa actividad (registrada), dentro del mismo período.")
+            text = "Días con algún registro este mes: ${calendarState.daysWithAnyActivityInMonth}/$denom",
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(3.dp))
+        Text(
+            text = if (isCurrentMonth) {
+                "Consistencia (%) = días marcados ÷ días con registro de la actividad (a la fecha) × 100."
+            } else {
+                "Consistencia (%) = días marcados ÷ días con registro de la actividad en el mes × 100."
             },
             fontSize = 11.sp,
+            lineHeight = 14.sp,
             color = MaterialTheme.colorScheme.outline,
         )
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
                 text = "Actividad",
-                fontSize = 12.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
             )
             Text(
                 text = "Consist.",
-                fontSize = 12.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.width(56.dp),
+                modifier = Modifier.width(52.dp),
+                textAlign = TextAlign.End,
             )
         }
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(2.dp))
         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(2.dp))
 
         if (calendarState.activityConsistency.isEmpty()) {
             Text(
                 text = "Sin actividades registradas en este mes.",
-                fontSize = 12.sp,
+                fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.outline,
             )
         } else {
@@ -240,34 +236,31 @@ private fun ActivityConsistencyKpiArea(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp),
+                        .padding(vertical = 1.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(modifier = Modifier.weight(1f).padding(end = 6.dp)) {
-                        Text(
-                            text = row.displayName,
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                        )
-                        Text(
-                            text = "${row.distinctCheckedDays}/${row.denominatorDays} marcados / con registro",
-                            fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.outline,
-                        )
-                    }
+                    Text(
+                        text = row.displayName,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp),
+                    )
                     Text(
                         text = "${row.consistencyPercent.roundToInt()}%",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.width(56.dp),
+                        modifier = Modifier.width(52.dp),
+                        textAlign = TextAlign.End,
                     )
                 }
             }
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(4.dp))
     }
 }
 @Composable
