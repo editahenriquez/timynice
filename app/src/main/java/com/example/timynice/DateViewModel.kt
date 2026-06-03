@@ -194,6 +194,7 @@ class DateViewModel(private val database: AppDatabase, val date: String) : ViewM
                         start = src.start,
                         end = src.end,
                         checked = false,
+                        esHabito = src.esHabito,
                     )
                 }
                 persistNormalizedActivities(copies)

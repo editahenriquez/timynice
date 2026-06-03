@@ -1,16 +1,23 @@
 package com.example.timynice
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -20,19 +27,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.timynice.ui.components.TimyniceSectionCard
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.ui.draw.shadow
-import kotlin.system.exitProcess
 
 @Composable
 fun CalendarScreen(
     calendarViewModel: CalendarViewModel,
-    onDayClick: (String) -> Unit
+    onDayClick: (String) -> Unit,
+    onClose: () -> Unit,
 ) {
     val calendarState by calendarViewModel.calendarState.collectAsState()
     val kpiScrollState = rememberScrollState()
@@ -40,106 +44,125 @@ fun CalendarScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(16.dp),
     ) {
-        // Top row with title and close button
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "Consistency is key! 😉 📈",
-                style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary,
-                fontSize = 25.sp,
-                modifier = Modifier.weight(1f)
-            )
-            IconButton(
-                onClick = { exitProcess(0) },
-                modifier = Modifier.size(48.dp)
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Timynice",
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = "Consistencia es clave 🗝️",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            IconButton(onClick = onClose) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ExitToApp,
-                    contentDescription = "Close App",
-                    tint = MaterialTheme.colorScheme.onSurface
+                    contentDescription = "Salir",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
 
-        // Header row: Year-Month and monthly accomplishment %
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = calendarState.yearMonth.format(DateTimeFormatter.ofPattern("yyyy - MMMM")),
-                fontSize = 22.sp,
-                style = MaterialTheme.typography.headlineMedium
-            )
-        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = calendarState.yearMonth.format(DateTimeFormatter.ofPattern("yyyy - MMMM")),
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
 
         Spacer(modifier = Modifier.height(8.dp))
-        // Weekday headers
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceAround
+            horizontalArrangement = Arrangement.SpaceAround,
         ) {
             listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat").forEach {
                 Text(
                     text = it,
+                    style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.width(44.dp),
-                    maxLines = 1
+                    maxLines = 1,
                 )
             }
         }
 
         Spacer(modifier = Modifier.height(4.dp))
-        // Days grid
         LazyVerticalGrid(
             columns = GridCells.Fixed(7),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            val firstDayOfMonth = calendarState.yearMonth.atDay(1).dayOfWeek.value % 7 // Sunday=0
+            val firstDayOfMonth = calendarState.yearMonth.atDay(1).dayOfWeek.value % 7
             val daysInMonth = calendarState.yearMonth.lengthOfMonth()
-            // Empty cells to offset first day according to weekday
             items(firstDayOfMonth) {
-                Box(modifier = Modifier.size(40.dp)) {}
+                Box(modifier = Modifier.size(40.dp))
             }
-            // Day cells with accomplishment percentage and click handler
             items(daysInMonth) { dayIndex ->
                 val day = dayIndex + 1
-                val dayStr = String.format("%04d-%02d-%02d", calendarState.yearMonth.year, calendarState.yearMonth.monthValue, day)
+                val dayStr = String.format(
+                    "%04d-%02d-%02d",
+                    calendarState.yearMonth.year,
+                    calendarState.yearMonth.monthValue,
+                    day,
+                )
                 val accomplish = calendarState.dayAccomplishments[dayStr] ?: 0f
                 val isToday = dayStr == LocalDate.now().toString()
                 val displayText = if (accomplish > 0f) "$day(${accomplish.toInt()}%)" else "$day"
 
                 val dayTextColor = when {
                     accomplish >= 100f -> MaterialTheme.colorScheme.primary
-                    accomplish >= 0f -> MaterialTheme.colorScheme.secondary
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    accomplish > 0f -> MaterialTheme.colorScheme.onSurfaceVariant
+                    else -> MaterialTheme.colorScheme.outline
                 }
 
+                val cellShape = MaterialTheme.shapes.small
                 Box(
                     modifier = Modifier
                         .size(44.dp)
                         .padding(horizontal = 2.dp, vertical = 2.dp)
-                        .shadow(elevation = if (isToday) 6.dp else 2.dp, shape = RoundedCornerShape(8.dp))
+                        .clip(cellShape)
                         .background(
-                            color = if (isToday) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                            shape = RoundedCornerShape(8.dp)
+                            color = if (isToday) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surface
+                            },
+                            shape = cellShape,
+                        )
+                        .then(
+                            if (isToday) {
+                                Modifier.border(
+                                    width = 1.5.dp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    shape = cellShape,
+                                )
+                            } else {
+                                Modifier.border(
+                                    width = 0.5.dp,
+                                    color = MaterialTheme.colorScheme.outlineVariant,
+                                    shape = cellShape,
+                                )
+                            },
                         )
                         .clickable { onDayClick(dayStr) },
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = displayText,
-                        fontSize = 11.sp, //10
-                        fontWeight = FontWeight.Normal,
-                        color = dayTextColor//MaterialTheme.colorScheme.onSurfaceVariant,//if (accomplish > 0f) Color.Blue else Color.Black,
+                        fontSize = 11.sp,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = dayTextColor,
                     )
                 }
             }
@@ -147,10 +170,10 @@ fun CalendarScreen(
         Spacer(modifier = Modifier.height(12.dp))
         AccomplishmentChartLine(
             dayAccomplishments = calendarState.dayAccomplishments,
-            yearMonth = calendarState.yearMonth
+            yearMonth = calendarState.yearMonth,
         )
         Spacer(modifier = Modifier.height(8.dp))
-        HorizontalDivider()
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Spacer(modifier = Modifier.height(6.dp))
         Column(
             modifier = Modifier
@@ -170,51 +193,56 @@ private fun ActivityConsistencyKpiArea(
     val denom = calendarState.consistencyDenominatorDays
     val ymNow = java.time.YearMonth.from(LocalDate.now())
     val isCurrentMonth = calendarState.yearMonth == ymNow
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(horizontal = 12.dp, vertical = 10.dp)
-    ) {
+    var showFormula by remember { mutableStateOf(false) }
+    val formulaText = if (isCurrentMonth) {
+        "Consistencia (%) = días marcados ÷ días con registro de la actividad (a la fecha) × 100."
+    } else {
+        "Consistencia (%) = días marcados ÷ días con registro de la actividad en el mes × 100."
+    }
+
+    TimyniceSectionCard {
         Text(
-            text = "Consistencia por actividad",
+            text = "Consistencia por actividad (Sólo hábitos)",
             style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = "Días con algún registro este mes: ${calendarState.daysWithAnyActivityInMonth}/$denom",
-            fontSize = 11.sp,
+            style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(modifier = Modifier.height(3.dp))
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
-            text = if (isCurrentMonth) {
-                "Consistencia (%) = días marcados ÷ días con registro de la actividad (a la fecha) × 100."
-            } else {
-                "Consistencia (%) = días marcados ÷ días con registro de la actividad en el mes × 100."
-            },
-            fontSize = 11.sp,
-            lineHeight = 14.sp,
-            color = MaterialTheme.colorScheme.outline,
+            text = if (showFormula) "Ocultar fórmula" else "Ver fórmula",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clickable { showFormula = !showFormula },
         )
-        Spacer(modifier = Modifier.height(6.dp))
+        if (showFormula) {
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = formulaText,
+                fontSize = 11.sp,
+                lineHeight = 14.sp,
+                color = MaterialTheme.colorScheme.outline,
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
                 text = "Actividad",
-                fontSize = 11.sp,
+                style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
             )
             Text(
                 text = "Consist.",
-                fontSize = 11.sp,
+                style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.width(52.dp),
@@ -222,27 +250,36 @@ private fun ActivityConsistencyKpiArea(
             )
         }
         Spacer(modifier = Modifier.height(2.dp))
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
         Spacer(modifier = Modifier.height(2.dp))
 
         if (calendarState.activityConsistency.isEmpty()) {
             Text(
-                text = "Sin actividades registradas en este mes.",
-                fontSize = 11.sp,
+                text = "Sin hábitos registrados en este mes.",
+                style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline,
             )
         } else {
-            calendarState.activityConsistency.forEach { row ->
+            val kpiRows = calendarState.activityConsistency
+            val dividerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+            kpiRows.forEachIndexed { index, row ->
+                if (index > 0) {
+                    HorizontalDivider(
+                        modifier = Modifier.fillMaxWidth(),
+                        thickness = 0.5.dp,
+                        color = dividerColor,
+                    )
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 1.dp),
+                        .padding(vertical = 3.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         text = row.displayName,
-                        fontSize = 12.sp,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         modifier = Modifier
@@ -251,8 +288,7 @@ private fun ActivityConsistencyKpiArea(
                     )
                     Text(
                         text = "${row.consistencyPercent.roundToInt()}%",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.width(52.dp),
                         textAlign = TextAlign.End,
@@ -263,10 +299,11 @@ private fun ActivityConsistencyKpiArea(
         Spacer(modifier = Modifier.height(4.dp))
     }
 }
+
 @Composable
 fun AccomplishmentChartLine(
     dayAccomplishments: Map<String, Float>,
-    yearMonth: java.time.YearMonth
+    yearMonth: java.time.YearMonth,
 ) {
     val daysInMonth = yearMonth.lengthOfMonth()
     val dataPoints = (1..daysInMonth).map { day ->
@@ -291,21 +328,20 @@ fun AccomplishmentChartLine(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp)
+            .padding(horizontal = 4.dp),
     ) {
-        // Fixed Y-axis labels (narrow to give more space to chart)
         Column(
             modifier = Modifier
                 .width(26.dp)
                 .height(maxHeight),
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.SpaceBetween,
         ) {
             yAxisSteps.forEach {
                 Text(
                     text = "${it.toInt()}%",
                     fontSize = 10.sp,
                     color = yAxisTextColor,
-                    modifier = Modifier.height(maxHeight / (yAxisSteps.size - 1))
+                    modifier = Modifier.height(maxHeight / (yAxisSteps.size - 1)),
                 )
             }
         }
@@ -315,13 +351,13 @@ fun AccomplishmentChartLine(
         BoxWithConstraints(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxWidth()
+                .fillMaxWidth(),
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(maxHeight)
+                        .height(maxHeight),
                 ) {
                     val chartHeightPx = with(LocalDensity.current) { maxHeight.toPx() }
 
@@ -337,7 +373,7 @@ fun AccomplishmentChartLine(
                                 color = lineColor,
                                 start = Offset(startX, startY),
                                 end = Offset(endX, endY),
-                                strokeWidth = 1.1.dp.toPx()
+                                strokeWidth = 1.1.dp.toPx(),
                             )
                         }
 
@@ -347,7 +383,7 @@ fun AccomplishmentChartLine(
                                 color = gridColor,
                                 start = Offset(0f, yPos),
                                 end = Offset(size.width, yPos),
-                                strokeWidth = 0.5.dp.toPx()
+                                strokeWidth = 0.5.dp.toPx(),
                             )
                         }
 
@@ -357,7 +393,7 @@ fun AccomplishmentChartLine(
                                 color = gridColor,
                                 start = Offset(x, 0f),
                                 end = Offset(x, size.height),
-                                strokeWidth = 0.5.dp.toPx()
+                                strokeWidth = 0.5.dp.toPx(),
                             )
                         }
 
@@ -367,7 +403,7 @@ fun AccomplishmentChartLine(
                             drawCircle(
                                 color = dotColor,
                                 radius = 2.dp.toPx(),
-                                center = Offset(x, y)
+                                center = Offset(x, y),
                             )
                         }
                     }
@@ -375,14 +411,14 @@ fun AccomplishmentChartLine(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(0.dp)
+                    horizontalArrangement = Arrangement.spacedBy(0.dp),
                 ) {
                     for (day in 1..daysInMonth) {
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth(),
-                            contentAlignment = Alignment.TopCenter
+                            contentAlignment = Alignment.TopCenter,
                         ) {
                             Text(
                                 text = day.toString(),

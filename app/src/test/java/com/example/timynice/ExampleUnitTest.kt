@@ -2,7 +2,10 @@ package com.example.timynice
 
 import com.example.timynice.room.ActivityEntity
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
+import java.time.YearMonth
 
 /**
  * Example local unit test, which will execute on the development machine (host).
@@ -60,5 +63,30 @@ class ExampleUnitTest {
         )
         assertEquals("09:45", scenario3[2].end)
         assertEquals("09:45", scenario3[3].start)
+    }
+
+    @Test
+    fun consistency_kpi_includes_only_esHabito_rows() {
+        val ym = YearMonth.of(2026, 5)
+        val day = "2026-05-10"
+        val activities = listOf(
+            ActivityEntity(
+                id = "1", dayId = day, name = "Habit A",
+                duration = "01:00", start = "08:00", end = "09:00",
+                checked = true, esHabito = true,
+            ),
+            ActivityEntity(
+                id = "2", dayId = day, name = "One-off",
+                duration = "00:30", start = "09:00", end = "09:30",
+                checked = true, esHabito = false,
+            ),
+        )
+        val (_, rows) = CalendarViewModel.buildActivityConsistencyKpis(
+            activities, ym, LocalDate.parse(day),
+        )
+        assertEquals(1, rows.size)
+        assertEquals("Habit A", rows[0].displayName)
+        assertEquals(100f, rows[0].consistencyPercent, 0.01f)
+        assertTrue(rows.none { it.displayName == "One-off" })
     }
 }

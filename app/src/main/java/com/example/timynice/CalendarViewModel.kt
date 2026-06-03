@@ -98,7 +98,7 @@ class CalendarViewModel(private val database: AppDatabase) : ViewModel() {
         private fun LocalDate.isInKpiWindow(window: ClosedRange<LocalDate>?): Boolean =
             window != null && this in window
 
-        private fun buildActivityConsistencyKpis(
+        internal fun buildActivityConsistencyKpis(
             activities: List<ActivityEntity>,
             yearMonth: YearMonth,
             today: LocalDate,
@@ -114,6 +114,7 @@ class CalendarViewModel(private val database: AppDatabase) : ViewModel() {
             val checkedDayIdsByNameKey = linkedMapOf<String, MutableSet<String>>()
             val labelByKey = linkedMapOf<String, String>()
             for (a in activities) {
+                if (!a.esHabito) continue
                 val raw = a.name.trim()
                 val key = raw.lowercase()
                 if (key.isEmpty()) continue

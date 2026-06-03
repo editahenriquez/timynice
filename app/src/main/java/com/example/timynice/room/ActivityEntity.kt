@@ -12,5 +12,6 @@ data class ActivityEntity(
     val duration: String,  // Duration in hh:mm
     val start: String,     // Start time in hh:mm
     val end: String,       // End time in hh:mm
-    val checked: Boolean = false  // Completion status
+    val checked: Boolean = false,  // Completion status
+    val esHabito: Boolean = true,  // Include in View1 consistency KPI when true
 )

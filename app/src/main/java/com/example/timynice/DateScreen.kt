@@ -26,9 +26,11 @@ import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SwipeToDismissBox
@@ -39,7 +41,6 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -59,8 +60,11 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarOutline
 import kotlin.math.roundToInt
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.zIndex
@@ -137,30 +141,42 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
         ) {
-            IconButton(onClick = onBackToCalendar, modifier = Modifier.size(20.dp)) {
+            IconButton(onClick = onBackToCalendar) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back to Calendar",
-                    modifier = Modifier.size(18.dp)
+                    contentDescription = "Volver al calendario",
+                    modifier = Modifier.size(20.dp),
                 )
             }
 
             Text(
                 text = date,
-                fontSize = 17.sp,
-                color = MaterialTheme.colorScheme.onSurface
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
         Spacer(modifier = Modifier.height(4.dp))
 
-        Text("Motivational Message / Comment", fontSize = 15.sp, color = MaterialTheme.colorScheme.outline)
+        Text(
+            text = "Comentario del día",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.outline,
+        )
         Spacer(modifier = Modifier.height(1.dp))
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, Color.Gray, shape = MaterialTheme.shapes.small)
-                .padding(horizontal = 8.dp, vertical = 6.dp)
+                .border(
+                    1.dp,
+                    MaterialTheme.colorScheme.outlineVariant,
+                    shape = MaterialTheme.shapes.small,
+                )
+                .background(
+                    MaterialTheme.colorScheme.surface,
+                    MaterialTheme.shapes.small,
+                )
+                .padding(horizontal = 8.dp, vertical = 6.dp),
         ) {
             BasicTextField(
                 value = editableMessage,
@@ -170,22 +186,22 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
                 },
                 textStyle = LocalTextStyle.current.copy(
                     fontSize = 15.sp,
-                    color = MaterialTheme.colorScheme.onBackground
+                    color = MaterialTheme.colorScheme.onSurface,
                 ),
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
             )
         }
         Spacer(modifier = Modifier.height(4.dp))
 
         Text(
-            text = if (accomplishment < 100) {
-                "Progress: ${accomplishment.toInt()}% 📈"
+            text = if (accomplishment >= 100f) {
+                "Progreso 100% Felicitaciones 🎉"
             } else {
-                "Congrats! Mission achieved: ${accomplishment.toInt()}% 🎉"
+                "Progreso: ${accomplishment.toInt()}%"
             },
+            style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.primary,
-            fontSize = 16.sp
         )
         Spacer(modifier = Modifier.height(2.dp))
 
@@ -199,41 +215,41 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
             Box(modifier = Modifier.width(28.dp))
             Text(
                 text = "Activity",
-                fontSize = 12.sp,
+                style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(2.4f),
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
             Text(
                 text = "Time",
-                fontSize = 12.sp,
+                style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(0.5f),
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
             Text(
                 text = "Start",
-                fontSize = 12.sp,
+                style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(0.5f),
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
             Text(
                 text = "End",
-                fontSize = 12.sp,
+                style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(0.5f),
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
             Box(modifier = Modifier.weight(0.4f)) // Placeholder for checkbox
         }
         Spacer(modifier = Modifier.height(1.8.dp))
 
-        // Activity list: swipe-left to delete (Compose SwipeToDismissBox; no RecyclerView/ItemTouchHelper in this app).
+        // Activity list: swipe right = toggle hábito, swipe left = delete (SwipeToDismissBox).
         val layoutDirection = LocalLayoutDirection.current
         LazyColumn(
             state = activityListState,
@@ -263,16 +279,34 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
                     label = "rowShadow",
                 )
                 var dragStepAccumulatedPx by remember(activity.id) { mutableFloatStateOf(0f) }
+                var pendingSwipeReset by remember(activity.id) { mutableStateOf(false) }
                 val dismissState = rememberSwipeToDismissBoxState(
                     confirmValueChange = { target ->
-                        if (target == SwipeToDismissBoxValue.EndToStart) {
-                            pendingDelete = activity
-                            false
-                        } else {
-                            true
+                        when (target) {
+                            SwipeToDismissBoxValue.EndToStart -> {
+                                pendingDelete = activity
+                                pendingSwipeReset = true
+                                false
+                            }
+                            SwipeToDismissBoxValue.StartToEnd -> {
+                                val latest = displayActivities.find { it.id == activity.id }
+                                    ?: activity
+                                viewModel.insertOrUpdateActivity(
+                                    latest.copy(esHabito = !latest.esHabito),
+                                )
+                                pendingSwipeReset = true
+                                false
+                            }
+                            else -> true
                         }
                     },
                 )
+                LaunchedEffect(pendingSwipeReset, activity.id) {
+                    if (pendingSwipeReset) {
+                        dismissState.reset()
+                        pendingSwipeReset = false
+                    }
+                }
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -373,22 +407,85 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
                         SwipeToDismissBox(
                             modifier = Modifier.weight(1f),
                             state = dismissState,
-                            enableDismissFromStartToEnd = false,
+                            enableDismissFromStartToEnd = true,
                             enableDismissFromEndToStart = true,
+                            gesturesEnabled = draggedActivityId == null && !isDraggingReorder,
                             backgroundContent = {
-                                val dismissTowardEnd = layoutDirection == LayoutDirection.Ltr
-                                Box(
-                                    Modifier
-                                        .fillMaxSize()
-                                        .background(MaterialTheme.colorScheme.errorContainer),
-                                    contentAlignment = if (dismissTowardEnd) Alignment.CenterEnd else Alignment.CenterStart,
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onErrorContainer,
-                                        modifier = Modifier.padding(horizontal = 16.dp),
-                                    )
+                                val isLtr = layoutDirection == LayoutDirection.Ltr
+                                val swipeDir = dismissState.dismissDirection
+                                    ?: dismissState.targetValue
+                                when (swipeDir) {
+                                    SwipeToDismissBoxValue.StartToEnd -> {
+                                        val willBeHabit = !activity.esHabito
+                                        val label = if (willBeHabit) "Marcar hábito" else "Quitar hábito"
+                                        Box(
+                                            Modifier
+                                                .fillMaxSize()
+                                                .background(MaterialTheme.colorScheme.primaryContainer),
+                                            contentAlignment = if (isLtr) {
+                                                Alignment.CenterStart
+                                            } else {
+                                                Alignment.CenterEnd
+                                            },
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 10.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            ) {
+                                                Icon(
+                                                    imageVector = if (willBeHabit) {
+                                                        Icons.Filled.Star
+                                                    } else {
+                                                        Icons.Outlined.StarOutline
+                                                    },
+                                                    contentDescription = label,
+                                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                    modifier = Modifier.size(18.dp),
+                                                )
+                                                Text(
+                                                    text = label,
+                                                    fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                    maxLines = 1,
+                                                )
+                                            }
+                                        }
+                                    }
+                                    SwipeToDismissBoxValue.EndToStart -> {
+                                        Box(
+                                            Modifier
+                                                .fillMaxSize()
+                                                .background(MaterialTheme.colorScheme.errorContainer),
+                                            contentAlignment = if (isLtr) {
+                                                Alignment.CenterEnd
+                                            } else {
+                                                Alignment.CenterStart
+                                            },
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 10.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Delete,
+                                                    contentDescription = "Eliminar",
+                                                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                                                    modifier = Modifier.size(18.dp),
+                                                )
+                                                Text(
+                                                    text = "Eliminar",
+                                                    fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                                    maxLines = 1,
+                                                )
+                                            }
+                                        }
+                                    }
+                                    else -> {
+                                        Box(Modifier.fillMaxSize())
+                                    }
                                 }
                             },
                             content = {
@@ -412,9 +509,10 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
-        )  {
-            FloatingActionButton(
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SmallFloatingActionButton(
                 onClick = {
                     coroutineScope.launch {
                         val newId = viewModel.appendEmptyActivity()
@@ -422,22 +520,24 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
                     }
                 },
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Activity")
+                Icon(Icons.Default.Add, contentDescription = "Añadir actividad")
             }
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(10.dp))
 
-            FloatingActionButton(
+            FilledTonalIconButton(
                 onClick = { showDuplicateDatePicker = true },
-                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                ),
             ) {
-                Icon(Icons.Filled.ContentCopy, contentDescription = "Duplicate day from date")
+                Icon(Icons.Filled.ContentCopy, contentDescription = "Duplicar día")
             }
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(10.dp))
 
-            FloatingActionButton(
+            FilledTonalIconButton(
                 onClick = {
                     if (activities.isEmpty()) {
                         showDeleteAllEmptyMessage = true
@@ -445,10 +545,12 @@ fun DateScreen(date: String, calendarViewModel: CalendarViewModel, onBackToCalen
                         showDeleteAllConfirm = true
                     }
                 },
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                ),
             ) {
-                Icon(Icons.Default.Delete, contentDescription = "Reset Activities")
+                Icon(Icons.Default.Delete, contentDescription = "Eliminar todas")
             }
         }
     }
@@ -616,6 +718,7 @@ fun ActivityRow(
     var duration by remember(activity.id) { mutableStateOf(activity.duration) }
     var start by remember(activity.id) { mutableStateOf(activity.start) }
     var checked by remember(activity.id) { mutableStateOf(activity.checked) }
+    var esHabito by remember(activity.id) { mutableStateOf(activity.esHabito) }
 
     var nameFieldFocused by remember(activity.id) { mutableStateOf(false) }
     var showDurationTimePicker by remember(activity.id) { mutableStateOf(false) }
@@ -638,6 +741,7 @@ fun ActivityRow(
         activity.end,
         activity.duration,
         activity.checked,
+        activity.esHabito,
         nameFieldFocused,
         showDurationTimePicker,
         showStartTimePicker
@@ -646,17 +750,25 @@ fun ActivityRow(
         if (!showDurationTimePicker) duration = activity.duration
         if (!showStartTimePicker) start = activity.start
         checked = activity.checked
+        esHabito = activity.esHabito
     }
 
     val rowFieldHeight = 20.dp
+    val nameTextAlpha = if (esHabito) 1f else 0.55f
 
+    val rowShape = RoundedCornerShape(5.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(View2Colors.stripeForIndex(rowIndex), RoundedCornerShape(5.dp))
+            .clip(rowShape)
+            .background(View2Colors.stripeForIndex(rowIndex), rowShape)
+            .border(
+                width = 0.5.dp,
+                color = MaterialTheme.colorScheme.outlineVariant,
+                shape = rowShape,
+            )
             .then(
-                if (!isDragged) Modifier.shadow(2.dp, RoundedCornerShape(5.dp))
-                else Modifier,
+                if (isDragged) Modifier.shadow(4.dp, rowShape, clip = false) else Modifier,
             ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -668,10 +780,11 @@ fun ActivityRow(
             modifier: Modifier = Modifier,
             enabled: Boolean = true,
             centerText: Boolean = false,
+            textAlpha: Float = 1f,
         ) {
             Box(
                 modifier = modifier
-                    .border(0.1.dp, MaterialTheme.colorScheme.outline, shape = RoundedCornerShape(2.dp))
+                    .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, shape = RoundedCornerShape(2.dp))
                     .background(MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(2.dp))
                     .padding(horizontal = 0.1.dp, vertical = 0.1.dp)
                     .height(rowFieldHeight)
@@ -686,7 +799,7 @@ fun ActivityRow(
                     textStyle = LocalTextStyle.current.copy(
                         fontSize = 13.sp,
                         textAlign = if (centerText) TextAlign.Center else TextAlign.Start,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = textAlpha),
                     ),
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -702,7 +815,7 @@ fun ActivityRow(
         ) {
             Box(
                 modifier = modifier
-                    .border(0.1.dp, MaterialTheme.colorScheme.outline, shape = RoundedCornerShape(2.dp))
+                    .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, shape = RoundedCornerShape(2.dp))
                     .background(MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(2.dp))
                     .padding(horizontal = 0.1.dp, vertical = 0.1.dp)
                     .height(rowFieldHeight)
@@ -720,19 +833,44 @@ fun ActivityRow(
             }
         }
 
-        CompactTextField(
-            value = name,
-            onValueChange = { name = it },
+        Box(
             modifier = Modifier
-                .focusRequester(nameFocusRequester)
                 .weight(2.4f)
-                .onFocusChanged { fs ->
-                    if (nameFieldFocused && !fs.isFocused) {
-                        onActivityChange(activity.copy(name = name))
+                .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, shape = RoundedCornerShape(2.dp))
+                .background(MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(2.dp))
+                .height(rowFieldHeight),
+        ) {
+            BasicTextField(
+                value = name,
+                onValueChange = { name = it },
+                singleLine = true,
+                textStyle = LocalTextStyle.current.copy(
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = nameTextAlpha),
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(nameFocusRequester)
+                    .onFocusChanged { fs ->
+                        if (nameFieldFocused && !fs.isFocused) {
+                            onActivityChange(activity.copy(name = name, esHabito = esHabito))
+                        }
+                        nameFieldFocused = fs.isFocused
                     }
-                    nameFieldFocused = fs.isFocused
-                }
-        )
+                    .padding(start = 2.dp, end = 16.dp, top = 1.dp, bottom = 1.dp),
+            )
+            Icon(
+                imageVector = if (esHabito) Icons.Filled.Star else Icons.Outlined.StarOutline,
+                contentDescription = if (esHabito) "Hábito (KPI)" else "No es hábito",
+                tint = MaterialTheme.colorScheme.onSurface.copy(
+                    alpha = if (esHabito) 0.75f else 0.35f,
+                ),
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 2.dp)
+                    .size(12.dp),
+            )
+        }
         Spacer(modifier = Modifier.width(0.dp))
 
         HhMmPickerCell(
@@ -762,7 +900,7 @@ fun ActivityRow(
             modifier = Modifier
                 .weight(0.4f)
                 .height(rowFieldHeight)
-                .border(0.1.dp, MaterialTheme.colorScheme.outline)
+                .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
                 .padding(horizontal = 0.1.dp, vertical = 0.1.dp)
                 .background(MaterialTheme.colorScheme.surface),
             contentAlignment = Alignment.Center

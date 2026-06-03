@@ -6,7 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 // Room database for timynice
-@Database(entities = [DayEntity::class, ActivityEntity::class], version = 1, exportSchema = false)
+@Database(entities = [DayEntity::class, ActivityEntity::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     // DAO accessors
     abstract fun dayDao(): DayDao

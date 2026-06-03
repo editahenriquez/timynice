@@ -1,5 +1,6 @@
 package com.example.timynice
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -9,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -20,8 +22,13 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var calendarViewModel: CalendarViewModel
 
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(FontScaleLock.wrapContext(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        FontScaleLock.ensureLocked(resources.configuration.fontScale)
 
         val database = AppDatabase.getDatabase(this)
         calendarViewModel = CalendarViewModel(database)
@@ -45,12 +52,14 @@ fun TimyniceApp(calendarViewModel: CalendarViewModel) {
 
     NavHost(navController = navController, startDestination = "calendar") {
         composable("calendar") {
+            val activity = LocalContext.current as MainActivity
             Box(modifier = Modifier.fillMaxSize()) {
                 CalendarScreen(
                     calendarViewModel = calendarViewModel,
                     onDayClick = { date ->
                         navController.navigate("date/$date")
-                    }
+                    },
+                    onClose = { activity.finish() },
                 )
             }
         }
