@@ -118,15 +118,15 @@ class CalendarViewModel(private val database: AppDatabase) : ViewModel() {
                 val raw = a.name.trim()
                 val key = raw.lowercase()
                 if (key.isEmpty()) continue
-                if (!labelByKey.containsKey(key)) labelByKey[key] = raw
                 val day = runCatching { LocalDate.parse(a.dayId) }.getOrNull() ?: continue
                 if (!day.isInKpiWindow(window)) continue
+                if (!labelByKey.containsKey(key)) labelByKey[key] = raw
                 registeredDayIdsByNameKey.getOrPut(key) { mutableSetOf() }.add(a.dayId)
                 if (a.checked) {
                     checkedDayIdsByNameKey.getOrPut(key) { mutableSetOf() }.add(a.dayId)
                 }
             }
-            val rows = labelByKey.keys.map { key ->
+            val rows = registeredDayIdsByNameKey.keys.map { key ->
                 val denom = registeredDayIdsByNameKey[key]?.size ?: 0
                 val checkedDays = checkedDayIdsByNameKey[key]?.size ?: 0
                 val pct = if (denom == 0) 0f else checkedDays * 100f / denom.toFloat()

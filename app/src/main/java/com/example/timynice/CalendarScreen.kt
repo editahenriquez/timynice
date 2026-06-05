@@ -202,7 +202,7 @@ private fun ActivityConsistencyKpiArea(
 
     TimyniceSectionCard {
         Text(
-            text = "Consistencia por actividad (Sólo hábitos)",
+            text = "Consistencia por actividad (Sólo hábitos★)",
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurface,
         )

@@ -89,4 +89,29 @@ class ExampleUnitTest {
         assertEquals(100f, rows[0].consistencyPercent, 0.01f)
         assertTrue(rows.none { it.displayName == "One-off" })
     }
+
+    @Test
+    fun consistency_kpi_excludes_future_only_habits() {
+        val ym = YearMonth.of(2026, 4)
+        val today = LocalDate.parse("2026-04-06")
+        val activities = listOf(
+            ActivityEntity(
+                id = "1", dayId = "2026-04-06", name = "Habit A",
+                duration = "01:00", start = "08:00", end = "09:00",
+                checked = true, esHabito = true,
+            ),
+            ActivityEntity(
+                id = "2", dayId = "2026-04-07", name = "Habit B",
+                duration = "01:00", start = "09:00", end = "10:00",
+                checked = true, esHabito = true,
+            ),
+        )
+        val (_, rows) = CalendarViewModel.buildActivityConsistencyKpis(
+            activities, ym, today,
+        )
+        assertEquals(1, rows.size)
+        assertEquals("Habit A", rows[0].displayName)
+        assertEquals(1, rows[0].denominatorDays)
+        assertTrue(rows.none { it.displayName == "Habit B" })
+    }
 }
